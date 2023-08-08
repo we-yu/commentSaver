@@ -1,0 +1,49 @@
+version: '3'
+services:
+  db:
+    container_name: db_container
+    image: mariadb:latest
+    restart: always
+    ports:
+      - "13316:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      # - db_data:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d
+    networks:
+      - backend
+
+  scraper:
+    container_name: scraper_container
+    tty: true
+    # ports:
+    #   - "10180:80"
+    build: .
+    volumes:
+      - .:/app
+    networks:
+      - backend
+    depends_on:
+      - db
+
+  api:
+    container_name: api_container
+    build: ./api
+    volumes:
+      - ./api:/usr/src/app
+    ports:
+      - "5110:5000"
+    networks:
+      - backend
+    depends_on:
+      - db
+
+networks:
+  backend:
+
+volumes:
+  db_data:
