@@ -60,18 +60,35 @@ class NicopediScraper:
             ErrorHandler.handle_error(e, f"URL error occurred: {e.reason}", PROGRAM_EXIT)
             return None
         ####################################################
-        return None
+        return soup
 
     def is_article_exist(self, soup):
-        # 記事内容が存在するページかチェック ----------------------------#
-        # 「存在しない記事」にのみ存在するクラスを取得
-        filter_condition = and_(Config.config_type == "ARTICLE NOT EXIST CLASS")
+        # # 記事内容が存在するページかチェック ----------------------------#
+        # # 「存在しない記事」にのみ存在するクラスを取得
+        # filter_condition = and_(Config.config_type == "ARTICLE NOT EXIST CLASS")
+        # configs = self.db.select(Config, filter_condition)
+        # config_value = configs[0].value
+        # print("config_value =", config_value)
+        # # ---------------------------------------------------------#
+
+        # class_exists = soup.find(class_=config_value) != None
+
+        debug_print("Func: is_article_exist()")
+        return self.is_exist_target_class(soup, "ARTICLE NOT EXIST CLASS")
+
+    def is_bbs_exist(self, soup):
+        debug_print("Func: is_bbs_exist()")
+        return self.is_exist_target_class(soup, "RES NOT EXIST CLASS")
+
+    def is_exist_target_class(self, soup, tag):
+        debug_print("Func: is_exist_target_class(), tag = ", tag)
+        filter_condition = and_(Config.config_type == tag)
         configs = self.db.select(Config, filter_condition)
         config_value = configs[0].value
-        print("config_value =", config_value)
-        # ---------------------------------------------------------#
 
         class_exists = soup.find(class_=config_value) != None
+
+        print("Is exist =", tag, "? -> ", class_exists)
 
         return class_exists
 
@@ -119,10 +136,12 @@ class NicopediScraper:
         debug_print("isValid = ", result)
 
         # 対象WebページのTopをスクレイプする
-        result = self.scrape_article_top(url)
+        soup = self.scrape_article_top(url)
 
         # 記事が存在するかチェック 404でハンドリングできるなら不要？
         # is_exist = self.is_article_exist(soup)
+
+        result = self.is_bbs_exist(soup)
 
         # 記事タイトルを取得
         title = self.get_title(soup)
@@ -196,6 +215,7 @@ def call_scraping():
     print("db_uri = ", db_uri)
     db = Database(db_uri)
     article_url = "https://dic.nicovideo.jp/a/asdfsdf"
+    article_url = "https://dic.nicovideo.jp/a/%E5%86%8D%E7%8F%BE"
 
     scraper = NicopediScraper(db)
     scraper.scrape_and_store(article_url)
