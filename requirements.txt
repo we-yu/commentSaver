@@ -1,0 +1,12 @@
+# For web scraping
+requests
+# For web scraping
+beautifulsoup4
+# For mysql connection
+pymysql
+# For database
+SQLAlchemy
+# For mysql connection
+mysql-connector-python
+# For text color change
+colorama
