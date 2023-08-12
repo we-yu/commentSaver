@@ -88,7 +88,7 @@ class NicopediScraper:
 
         class_exists = soup.find(class_=config_value) != None
 
-        print("Is exist =", tag, "? -> ", class_exists)
+        debug_print("Exist check = ", class_exists)
 
         return class_exists
 
@@ -141,12 +141,12 @@ class NicopediScraper:
         # 記事が存在するかチェック 404でハンドリングできるなら不要？
         # is_exist = self.is_article_exist(soup)
 
+        # 記事に取得可能なレスが存在するかチェック
         result = self.is_bbs_exist(soup)
 
         # 記事タイトルを取得
         title = self.get_title(soup)
         debug_print("title = ["+ title +"]")
-        # 記事に取得可能なレスが存在するかチェック
 
         # 記事の掲示板URL群を取得
 
