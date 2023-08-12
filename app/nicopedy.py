@@ -88,7 +88,7 @@ class NicopediScraper:
 
         class_exists = soup.find(class_=config_value) != None
 
-        print("Is exist =", tag, "? -> ", class_exists)
+        debug_print("Exist check = ", class_exists)
 
         return class_exists
 
