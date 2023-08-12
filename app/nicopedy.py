@@ -115,8 +115,17 @@ class NicopediScraper:
 
         return article_title
     
-    # 30レス以上が存在する場合は複数ページにまたがるため、捜索対象URLのリストを取得
-    def get_urls(topUrl):
+    # 捜索対象URLを取得
+    # 30レス以上の場合は複数となる
+    def get_urls(soup):
+        
+        if not soup.find("div", class_="st-pg_contents"):
+            debug_print("No div class = st-pg_contents")
+            return None
+        
+        pagers = soup.select("div.st-pg_contents > a")
+        debug_print("pagers = ", pagers)
+
         return None
 
     # 当該ページの全レスを取得する
@@ -141,12 +150,15 @@ class NicopediScraper:
         # 記事が存在するかチェック 404でハンドリングできるなら不要？
         # is_exist = self.is_article_exist(soup)
 
+        # 記事に取得可能なレスが存在するかチェック
         result = self.is_bbs_exist(soup)
+        if result == False:
+            debug_print("BBS is not exist.")
+            return None
 
         # 記事タイトルを取得
         title = self.get_title(soup)
         debug_print("title = ["+ title +"]")
-        # 記事に取得可能なレスが存在するかチェック
 
         # 記事の掲示板URL群を取得
 
