@@ -11,6 +11,7 @@ from bs4 import BeautifulSoup
 import re # 正規表現用
 from time import sleep      # 待ち時間用
 from sqlalchemy import and_, or_, not_
+from datetime import datetime
 
 # Local
 # Set import module directory
@@ -22,6 +23,11 @@ from debug_tools import debug_print
 from db_operator import Database
 from models import Website, Config, ArticleList, ArticleDetail
 from error_handler import ErrorHandler, PROGRAM_EXIT, PROGRAM_CONTINUE
+
+# 掲示板、1Pあたりのレス数
+RES_IN_SINGLEPAGE = 30
+# スクレイピング間隔(秒)
+SCRAPING_INTERVAL = 5
 
 class NicopediScraper:
     def __init__(self, db):
@@ -43,6 +49,7 @@ class NicopediScraper:
 
         return is_Nicopedi_URL
     
+    # 対象URLからスクレイピングデータの取得、ページが存在しない場合はメッセージ表示して終了
     def scrape_article_top(self, url):
         ####################################################
         # http://yamori-jp.blogspot.com/2022/09/python-ssl-unsafelegacyrenegotiationdis.html
@@ -62,35 +69,33 @@ class NicopediScraper:
         ####################################################
         return soup
 
-    def is_article_exist(self, soup):
-        # # 記事内容が存在するページかチェック ----------------------------#
-        # # 「存在しない記事」にのみ存在するクラスを取得
-        # filter_condition = and_(Config.config_type == "ARTICLE NOT EXIST CLASS")
-        # configs = self.db.select(Config, filter_condition)
-        # config_value = configs[0].value
-        # print("config_value =", config_value)
-        # # ---------------------------------------------------------#
+    # 記事内容が存在するページかチェック
+    # 「存在しない記事」にのみ存在するクラスを取得
+    # "scrape_article_top"でエラーハンドリングできているため不要
+    # def is_article_exist(self, soup):
+    #     debug_print("Func: is_article_exist()")
+    #     return self.is_exist_target_class(soup, "ARTICLE NOT EXIST CLASS")
 
-        # class_exists = soup.find(class_=config_value) != None
-
-        debug_print("Func: is_article_exist()")
-        return self.is_exist_target_class(soup, "ARTICLE NOT EXIST CLASS")
-
+    # 記事に取得可能なレスが存在するかチェック
+    # レスが無い場合はBBSそのものが存在しない
     def is_bbs_exist(self, soup):
         debug_print("Func: is_bbs_exist()")
+        #  BBSが存在しない場合は「st-pg_contents」クラスが存在しない。マークとなるクラス名はDB内で定義済み。
         return self.is_exist_target_class(soup, "RES NOT EXIST CLASS")
 
+    # 渡したsoupデータ内に、tagで指定したクラスが存在するかチェック
     def is_exist_target_class(self, soup, tag):
         debug_print("Func: is_exist_target_class(), tag = ", tag)
+
+        # tagを手掛かりに、DBからクラス名を取得
         filter_condition = and_(Config.config_type == tag)
         configs = self.db.select(Config, filter_condition)
         config_value = configs[0].value
 
-        debug_print("config_value =", config_value)
-
+        # 引っ張ってきたクラスが存在するかチェック（存在する場合はTrueを返す）
         class_exists = soup.find(class_=config_value) != None
 
-        debug_print("Exist check = ", class_exists)
+        debug_print(f"Is exists {config_value} ? => {class_exists}")
 
         return class_exists
 
@@ -120,28 +125,28 @@ class NicopediScraper:
     # BBSの最終ページ番号を取得
     def get_bbs_length(self, soup):
         
-        # st-pg_contentsクラスが存在しない場合は掲示板レス自体が存在しない
-        if not soup.find("div", class_="st-pg_contents"):
-            debug_print("No div class = st-pg_contents")
-            return None
-        
         # st-pg_contents下にあるaタグを取得
         pagers = soup.select("div.st-pg_contents > a")
         # debug_print("pagers = ", pagers)
 
-        # 取得した要素が一つだけだった場合、要素一つの配列に格納
+        # 取得した要素が一つだけ(レス数が30以下)だった場合、要素一つの配列に格納
         if not isinstance(pagers, list):
             pagers = [pagers]
 
-        # ページ番号(数値)格納用配列
-        page_value = []
-
+        # ページャーの最後の要素を取得(必要なのは最後のページ番号のみ)
         last_value = pagers[-1].getText()
+
+        # 要素から数値のみを取得
         last_value = re.search(r'(\d+)', last_value)
         last_value = int(last_value.group(1))
+
         debug_print("last_value = ", last_value)
 
+        # 最終ページ番号を返す
         return last_value
+
+        # ページ番号(数値)格納用配列
+        page_value = []
 
         for page in pagers:
             # 前へ, 1-, 31-等のテキスト部分を文字列取得。
@@ -163,12 +168,117 @@ class NicopediScraper:
 
         return page_value
 
+    # 最終ページ番号・記事トップURLから走査対象となるURLリストを生成
     def get_allpages_url(self, top_url, last_page):
-        return None
+        pages = []
+
+        base_url = top_url
+        base_url = base_url.replace('/a/', '/b/a/')
+
+        # https://dic.nicovideo.jp/b/a/linux/151- というフォーマットのURLを生成
+        for page in range(1, last_page + 1, RES_IN_SINGLEPAGE):
+            generate_url = base_url + f"/{page}-"
+            pages.append(generate_url)
+
+        return pages
 
     # 当該ページの全レスを取得する
-    def get_allres_inpage(url):
+    def get_allres_inpage(self, page_urls):
+        # ctx = ssl.create_default_context()
+        # ctx.options |= 0x4
+        # # 対象記事が存在しない場合のハンドリング
+        # try:
+        #     with urllib.request.urlopen(url, context=ctx) as response:
+        #         web_content = response.read()
+        #     soup = BeautifulSoup(web_content, "html.parser")        
+
+        ctx = ssl.create_default_context()
+        ctx.options |= 0x4
+
+        for idx, page_url in enumerate(page_urls):
+            debug_print(f"page_url [{idx}] = {page_url}")
+
+            with urllib.request.urlopen(page_url, context=ctx) as response:
+                html_content = response.read()
+
+            # html.parserでパーサーを指定してBeautifulSoupで解析
+            soup = BeautifulSoup(html_content, 'html.parser')
+
+            res_heads = soup.find_all("dt", class_="st-bbs_reshead")
+            res_bodys = soup.find_all("dd", class_="st-bbs_resbody")
+
+            formatted_Head = []
+            formatted_Body = []
+
+            for in_idx, res_head in enumerate(res_heads):
+                debug_print("================================")
+                # debug_print("res_head = ", res_head)
+
+                # レス番号・投稿者名取得
+                bbs_res_no = res_head.find("span", class_="st-bbs_resNo").getText()
+                bbs_name = res_head.find("span", class_="st-bbs_name").getText()
+
+                # その他投稿者情報取得
+                bbs_res_Info = res_head.find("div", class_="st-bbs_resInfo")
+
+                # 投稿日時取得
+                bbs_res_info_time = bbs_res_Info.find("span", class_="bbs_resInfo_resTime").getText()
+                # bbs_res_info_time を日本語の曜日から英語の曜日に変換
+                bbs_res_info_time_en = self.convert_jp_weekday_to_en(bbs_res_info_time)
+                # 変換後の文字列を datetime オブジェクトに変換
+                post_datetime = datetime.strptime(bbs_res_info_time_en, '%Y/%m/%d(%a) %H:%M:%S')
+
+                # 投稿者ID取得
+                bbs_res_info_id = bbs_res_Info.get_text().strip()
+                id_text = bbs_res_info_id.split('ID:')[1].strip()
+                id_text = id_text.split(' ')[0].strip()
+
+                # debug_print("bbs_res_no = ", bbs_res_no)
+                # debug_print("bbs_name = ", bbs_name)
+                # debug_print ("bbs_res_info_time = ", post_datetime.date(), post_datetime.strftime("%a"), post_datetime.time())
+                # debug_print("id_text = ", id_text)
+
+                if in_idx == 3:
+                    break
+            
+            for in_idx, res_body in enumerate(res_bodys):
+                debug_print("================================")
+                # debug_print("res_body = ", res_body)
+
+                b = str(res_body)
+                b = b.replace('<br>', '\n')
+                b = b.replace('<br/>', '\n')
+                b = BeautifulSoup(b, 'html.parser').getText()
+
+                b = b.strip()
+                b = b.strip('\n')
+
+                debug_print("body text :\n"+b)  
+
+                if in_idx == 15:
+                    break
+
+            # スクレイピング間隔を空ける
+            # sleep(SCRAPING_INTERVAL)
+
         return None
+
+    def convert_jp_weekday_to_en(self, date_str):
+        weekdays_jp_to_en = {
+            '(日)': '(Sun)',
+            '(月)': '(Mon)',
+            '(火)': '(Tue)',
+            '(水)': '(Wed)',
+            '(木)': '(Thu)',
+            '(金)': '(Fri)',
+            '(土)': '(Sat)'
+        }
+        
+        for jp, en in weekdays_jp_to_en.items():
+            date_str = date_str.replace(jp, en)
+        return date_str
+
+
 
     # 取得したレスデータをDBへ書き込む
     def insert_table(input_resinfo):
@@ -199,10 +309,17 @@ class NicopediScraper:
             debug_print("BBS is not exist.")
             return None
 
-        # 記事の掲示板URL群を取得
-        pages = self.get_bbs_length(soup)
-        # debug_print("pages = ", pages)
+        # 記事の掲示板URLの最終ページ番号を取得
+        last_page = self.get_bbs_length(soup)
+
+        # 取得対象となる掲示板レスのURLリストを取得
+        all_page_urls = self.get_allpages_url(url, last_page)
+
+        # for page_url in all_page_urls:
+        #     debug_print("page_url = ", page_url)
+
         # 記事の全レスを取得
+        all_res = self.get_allres_inpage(all_page_urls)
 
         # DBへ書き込み
 
@@ -266,10 +383,10 @@ def call_scraping():
     db_uri = 'mysql+pymysql://admin:S8n6F2a!@db_container/nico_db'
     print("db_uri = ", db_uri)
     db = Database(db_uri)
-    article_url = "https://dic.nicovideo.jp/a/asdfsdf"
-    article_url = "https://dic.nicovideo.jp/a/%E5%86%8D%E7%8F%BE" # 再現
-    article_url = "https://dic.nicovideo.jp/a/%E5%9C%9F%E8%91%AC" # 土葬
-    article_url = "https://dic.nicovideo.jp/a/%E3%82%A2%E3%83%80%E3%83%AB%E3%83%88%E3%83%93%E3%83%87%E3%82%AA%E3%81%AB%E3%81%8A%E3%81%91%E3%82%8B%E3%83%84%E3%83%83%E3%82%B3%E3%83%9F%E3%81%A9%E3%81%93%E3%82%8D%E3%81%AE%E5%A4%9A%E3%81%84%E5%B1%95%E9%96%8B%E4%B8%80%E8%A6%A7"    # アダルトビデオにおけるツッコミどころの多い展開一覧(67)
+    article_url = "https://dic.nicovideo.jp/a/asdfsdf"  # 存在しない記事
+    article_url = "https://dic.nicovideo.jp/a/%E5%86%8D%E7%8F%BE" # 再現 / レス数0サンプル
+    article_url = "https://dic.nicovideo.jp/a/Linux"    # Linux / レス数100超えサンプル
+    article_url = "https://dic.nicovideo.jp/a/%E5%9C%9F%E8%91%AC" # 土葬 / レス数30以下サンプル
 
     scraper = NicopediScraper(db)
     scraper.scrape_and_store(article_url)
