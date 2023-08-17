@@ -86,6 +86,8 @@ class NicopediScraper:
         configs = self.db.select(Config, filter_condition)
         config_value = configs[0].value
 
+        debug_print("config_value =", config_value)
+
         class_exists = soup.find(class_=config_value) != None
 
         debug_print("Exist check = ", class_exists)
@@ -115,17 +117,53 @@ class NicopediScraper:
 
         return article_title
     
-    # 捜索対象URLを取得
-    # 30レス以上の場合は複数となる
-    def get_urls(soup):
+    # BBSの最終ページ番号を取得
+    def get_bbs_length(self, soup):
         
+        # st-pg_contentsクラスが存在しない場合は掲示板レス自体が存在しない
         if not soup.find("div", class_="st-pg_contents"):
             debug_print("No div class = st-pg_contents")
             return None
         
+        # st-pg_contents下にあるaタグを取得
         pagers = soup.select("div.st-pg_contents > a")
-        debug_print("pagers = ", pagers)
+        # debug_print("pagers = ", pagers)
 
+        # 取得した要素が一つだけだった場合、要素一つの配列に格納
+        if not isinstance(pagers, list):
+            pagers = [pagers]
+
+        # ページ番号(数値)格納用配列
+        page_value = []
+
+        last_value = pagers[-1].getText()
+        last_value = re.search(r'(\d+)', last_value)
+        last_value = int(last_value.group(1))
+        debug_print("last_value = ", last_value)
+
+        return last_value
+
+        for page in pagers:
+            # 前へ, 1-, 31-等のテキスト部分を文字列取得。
+            page = page.getText()
+            # debug_print("target page = ", page)
+            # 正規表現を使い数値のみ取得("1-" -> 1)
+            page = re.search(r'(\d+)', page)
+            if page:
+                # 番号格納用配列へ追加
+                page_value.append(int(page.group(1)))
+
+        # ページャーはBBSの上下にあるため、重複している値を削除（後半部分を削除）        
+        half_length = len(page_value) // 2
+        page_value = page_value[:half_length]
+
+        # 確認用
+        for idx, page in enumerate(page_value):
+            debug_print(f"page {idx} = {page}")
+
+        return page_value
+
+    def get_allpages_url(self, top_url, last_page):
         return None
 
     # 当該ページの全レスを取得する
@@ -150,18 +188,20 @@ class NicopediScraper:
         # 記事が存在するかチェック 404でハンドリングできるなら不要？
         # is_exist = self.is_article_exist(soup)
 
+        # 記事タイトルを取得
+        title = self.get_title(soup)
+        debug_print("title = ["+ title +"]")
+
+
         # 記事に取得可能なレスが存在するかチェック
         result = self.is_bbs_exist(soup)
         if result == False:
             debug_print("BBS is not exist.")
             return None
 
-        # 記事タイトルを取得
-        title = self.get_title(soup)
-        debug_print("title = ["+ title +"]")
-
         # 記事の掲示板URL群を取得
-
+        pages = self.get_bbs_length(soup)
+        # debug_print("pages = ", pages)
         # 記事の全レスを取得
 
         # DBへ書き込み
@@ -227,7 +267,9 @@ def call_scraping():
     print("db_uri = ", db_uri)
     db = Database(db_uri)
     article_url = "https://dic.nicovideo.jp/a/asdfsdf"
-    article_url = "https://dic.nicovideo.jp/a/%E5%86%8D%E7%8F%BE"
+    article_url = "https://dic.nicovideo.jp/a/%E5%86%8D%E7%8F%BE" # 再現
+    article_url = "https://dic.nicovideo.jp/a/%E5%9C%9F%E8%91%AC" # 土葬
+    article_url = "https://dic.nicovideo.jp/a/%E3%82%A2%E3%83%80%E3%83%AB%E3%83%88%E3%83%93%E3%83%87%E3%82%AA%E3%81%AB%E3%81%8A%E3%81%91%E3%82%8B%E3%83%84%E3%83%83%E3%82%B3%E3%83%9F%E3%81%A9%E3%81%93%E3%82%8D%E3%81%AE%E5%A4%9A%E3%81%84%E5%B1%95%E9%96%8B%E4%B8%80%E8%A6%A7"    # アダルトビデオにおけるツッコミどころの多い展開一覧(67)
 
     scraper = NicopediScraper(db)
     scraper.scrape_and_store(article_url)
