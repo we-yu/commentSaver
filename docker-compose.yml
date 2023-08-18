@@ -2,7 +2,9 @@ version: '3'
 services:
   db:
     container_name: db_container
-    image: mariadb:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.MariaDB
     restart: always
     ports:
       - "13316:3306"
