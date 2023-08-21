@@ -23,6 +23,7 @@ class ArticleList(Base):
     article_id = Column(Integer)
     title = Column(String(255), nullable=False)
     url = Column(String(255), nullable=False)
+    last_res_id = Column(Integer)
     moved = Column(Boolean)
     new_id = Column(Integer)
 

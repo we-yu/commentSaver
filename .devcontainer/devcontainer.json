@@ -1,0 +1,10 @@
+{
+    "name": "Your Dev Container Name",
+    "dockerComposeFile": "../docker-compose.yml",
+    "service": "your-service-name",
+    "workspaceFolder": "/path/in/container",
+    "extensions": [
+      "ms-python.python"
+    ]
+  }
+  

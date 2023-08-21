@@ -10,3 +10,5 @@ SQLAlchemy
 mysql-connector-python
 # For text color change
 colorama
+# For symbolic mathematics
+sympy
