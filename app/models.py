@@ -27,6 +27,9 @@ class ArticleList(Base):
     moved = Column(Boolean)
     new_id = Column(Integer)
 
+    def __repr__(self):
+        return f"ArticleList(id={self.id}, article_id={self.article_id}, title='{self.title}', url='{self.url}', last_res_id={self.last_res_id}, moved={self.moved}, new_id={self.new_id})"
+
 class ArticleDetail(Base):
     __tablename__ = 'article_detail'
 
@@ -38,6 +41,9 @@ class ArticleDetail(Base):
     bodytext = Column(Text)
     page_url = Column(String(255))
     deleted = Column(Boolean)
+
+    def __repr__(self):
+        return f"ArticleDetail(article_id={self.article_id}, resno={self.resno}, post_name='{self.post_name}', post_date={self.post_date}, user_id='{self.user_id}', bodytext='{self.bodytext[:10]}', page_url='{self.page_url}', deleted={self.deleted})"
 
 class Website(Base):
     __tablename__ = 'websites'
