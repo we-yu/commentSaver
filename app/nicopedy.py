@@ -7,10 +7,12 @@ from requests.packages.urllib3.util import ssl_
 import urllib.request
 import ssl
 
+from sympy import fibonacci
+
 from bs4 import BeautifulSoup
 import re # 正規表現用
 from time import sleep      # 待ち時間用
-from sqlalchemy import and_, or_, not_
+from sqlalchemy import and_, or_, not_, asc, desc
 from datetime import datetime
 
 # Local
@@ -19,15 +21,16 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 import_dir = os.path.join(current_dir, 'util')
 sys.path.append(import_dir)
 
+from models import Website, Config, ArticleList, ArticleDetail
 from debug_tools import debug_print
 from db_operator import Database
-from models import Website, Config, ArticleList, ArticleDetail
 from error_handler import ErrorHandler, PROGRAM_EXIT, PROGRAM_CONTINUE
+from date_tools import convert_jp_weekday_to_en
 
 # 掲示板、1Pあたりのレス数
-RES_IN_SINGLEPAGE = 30
+RESPONSES_PER_PAGE = 30  # 1ページあたりの表示数
 # スクレイピング間隔(秒)
-SCRAPING_INTERVAL = 5
+SCRAPING_INTERVAL = 1
 
 class NicopediScraper:
     def __init__(self, db):
@@ -69,6 +72,22 @@ class NicopediScraper:
         ####################################################
         return soup
 
+    # 記事IDを取得
+    def get_article_id(self, soup):
+        article_id = 0
+        meta_og_url = soup.find("meta", {"property": "og:url"})
+
+        meta_url = meta_og_url.get("content")
+        article_id = meta_url.rsplit('/', 1)[-1]  # URLの最後の部分を取得
+
+        return article_id
+
+    # 記事に取得可能なレスが存在するかチェック
+    # レスが無い場合はBBSそのものが存在しない
+    def is_bbs_exist(self, soup):
+        #  BBSが存在しない場合は「st-pg_contents」クラスが存在しない。マークとなるクラス名はDB内で定義済み。
+        return self.is_exist_target_class(soup, "RES NOT EXIST CLASS")
+
     # 記事内容が存在するページかチェック
     # 「存在しない記事」にのみ存在するクラスを取得
     # "scrape_article_top"でエラーハンドリングできているため不要
@@ -76,17 +95,8 @@ class NicopediScraper:
     #     debug_print("Func: is_article_exist()")
     #     return self.is_exist_target_class(soup, "ARTICLE NOT EXIST CLASS")
 
-    # 記事に取得可能なレスが存在するかチェック
-    # レスが無い場合はBBSそのものが存在しない
-    def is_bbs_exist(self, soup):
-        debug_print("Func: is_bbs_exist()")
-        #  BBSが存在しない場合は「st-pg_contents」クラスが存在しない。マークとなるクラス名はDB内で定義済み。
-        return self.is_exist_target_class(soup, "RES NOT EXIST CLASS")
-
     # 渡したsoupデータ内に、tagで指定したクラスが存在するかチェック
     def is_exist_target_class(self, soup, tag):
-        debug_print("Func: is_exist_target_class(), tag = ", tag)
-
         # tagを手掛かりに、DBからクラス名を取得
         filter_condition = and_(Config.config_type == tag)
         configs = self.db.select(Config, filter_condition)
@@ -95,9 +105,42 @@ class NicopediScraper:
         # 引っ張ってきたクラスが存在するかチェック（存在する場合はTrueを返す）
         class_exists = soup.find(class_=config_value) != None
 
-        debug_print(f"Is exists {config_value} ? => {class_exists}")
+        # debug_print(f"Is exists {config_value} ? => {class_exists}")
 
         return class_exists
+
+    # 記事が既にスクレイピング済みか(DB内に当該記事が存在するか)チェック。スクレイピング済みであれば最終レス番号を取得。
+    def is_already_scraped(self, article_id):
+        # article_idをキーにDBから記事情報を取得
+        filter_condition = ArticleList.article_id == article_id
+        result = self.db.select(ArticleList, filter_condition)
+        
+        matched_records = result.count()
+        
+        # 既にレコードが存在するかチェックする。
+
+        fetched_record = None
+
+        # 1件発見(正常)
+        if matched_records == 1:
+            # レコードが存在する場合
+            if result[0].last_res_id is not None:
+                # スクレイピング済みであれば
+                fetched_record = result[0]
+                debug_print("Already scraped. Last res no is ", fetched_record.last_res_id)
+            else:
+                # スクレイピングがまだであれば
+                scraped = False
+                last_res_no = 0 # last_res_idにNULLが設定されている場合
+        elif matched_records >= 2:
+            # レコードが2件以上存在する場合はエラー
+            # 異常ケース
+            ErrorHandler.handle_error(None, f"Duplicate records found. article_id = {article_id}", PROGRAM_EXIT)
+        else:
+            # レコードが存在しない場合 = 未走査なら正常
+            debug_print("Never scraped. article_id = ", article_id)
+
+        return fetched_record
 
     # 記事タイトルを取得
     def get_title(self, soup):
@@ -121,8 +164,17 @@ class NicopediScraper:
         article_title = article_title.replace(' ', '_')
 
         return article_title
-    
-    # BBSの最終ページ番号を取得
+
+    # レス番号からページ番号を取得
+    def get_page_number_from_res_id(self, res_id):
+        # 0以下は1ページ目とする。（未スクレイピング対象であっても、この処理まで来ているということは最低1レスは存在する）
+        if res_id < 1:
+            res_id = 1
+        
+        page_number = ((res_id - 1) // RESPONSES_PER_PAGE) * RESPONSES_PER_PAGE + 1
+        return page_number
+
+    # BBSの最終ページ番号を取得(最終レス番号は記事TOPページに記載されている)
     def get_bbs_length(self, soup):
         
         # st-pg_contents下にあるaタグを取得
@@ -140,145 +192,173 @@ class NicopediScraper:
         last_value = re.search(r'(\d+)', last_value)
         last_value = int(last_value.group(1))
 
-        debug_print("last_value = ", last_value)
-
         # 最終ページ番号を返す
         return last_value
 
-        # ページ番号(数値)格納用配列
-        page_value = []
+    # 開始ページ番・最終ページ番から走査対象となるURLリストを生成
+    def get_scrape_target_urls(self, article_url, start_page, end_page):
 
-        for page in pagers:
-            # 前へ, 1-, 31-等のテキスト部分を文字列取得。
-            page = page.getText()
-            # debug_print("target page = ", page)
-            # 正規表現を使い数値のみ取得("1-" -> 1)
-            page = re.search(r'(\d+)', page)
-            if page:
-                # 番号格納用配列へ追加
-                page_value.append(int(page.group(1)))
+        debug_print(f"Scraping, start page = {start_page}, end page = {end_page}")
 
-        # ページャーはBBSの上下にあるため、重複している値を削除（後半部分を削除）        
-        half_length = len(page_value) // 2
-        page_value = page_value[:half_length]
-
-        # 確認用
-        for idx, page in enumerate(page_value):
-            debug_print(f"page {idx} = {page}")
-
-        return page_value
-
-    # 最終ページ番号・記事トップURLから走査対象となるURLリストを生成
-    def get_allpages_url(self, top_url, last_page):
-        pages = []
-
-        base_url = top_url
+        # 1, 31, 61, ... という形でページ番号が指定されているかチェック
+        if(start_page % RESPONSES_PER_PAGE != 1):
+            debug_print("Invalid start_page = ", start_page)
+            return None
+        if(end_page % RESPONSES_PER_PAGE != 1):
+            debug_print("Invalid end_page = ", end_page)
+            return None
+        
+        # 掲示板に入るために一部URLを書き換える
+        base_url = article_url
         base_url = base_url.replace('/a/', '/b/a/')
 
-        # https://dic.nicovideo.jp/b/a/linux/151- というフォーマットのURLを生成
-        for page in range(1, last_page + 1, RES_IN_SINGLEPAGE):
+        # 走査対象となるURLリストを生成
+        pages = []
+        for page in range(start_page, end_page + 1, RESPONSES_PER_PAGE):
             generate_url = base_url + f"/{page}-"
             pages.append(generate_url)
 
         return pages
 
-    # 当該ページの全レスを取得する
-    def get_allres_inpage(self, page_urls):
-        # ctx = ssl.create_default_context()
-        # ctx.options |= 0x4
-        # # 対象記事が存在しない場合のハンドリング
-        # try:
-        #     with urllib.request.urlopen(url, context=ctx) as response:
-        #         web_content = response.read()
-        #     soup = BeautifulSoup(web_content, "html.parser")        
+    # 指定したURL(群)に存在する全レスを取得。
+    def get_allres_from_pages(self, page_urls):
+        debug_print("Func: get_allres_from_pages()")
+
+        all_res = []
+
+        # 指定した単一URLに存在する全レスを取得。（最大30レス）
+        for idx, page_url in enumerate(page_urls):
+            debug_print(f"page_url [{idx}] = {page_url}")
+            result_single_page = self.get_allres_inpage(page_url)
+
+            # 取得したレスを全レスリストに追加
+            for res_in_page in result_single_page:
+                all_res.append(res_in_page)
+  
+        return all_res
+
+    # 指定した単一URLに存在する全レスを取得。
+    def get_allres_inpage(self, page_url):
 
         ctx = ssl.create_default_context()
         ctx.options |= 0x4
 
-        for idx, page_url in enumerate(page_urls):
-            debug_print(f"page_url [{idx}] = {page_url}")
-
+        # 対象記事が存在しない場合のハンドリング
+        try:
+            # 対象ページを取得
             with urllib.request.urlopen(page_url, context=ctx) as response:
                 html_content = response.read()
+        except urllib.error.HTTPError as e:
+            if e.code >= 500:  # サーバーエラー
+                debug_print(f"Server error. HTTP status code: {e.code}")
+                debug_print("Program will be terminated.")
+                exit(1)  # プログラムを終了
+            elif e.code >= 400:  # クライアントエラー
+                debug_print(f"Client error. HTTP status code: {e.code}")
+                debug_print("Program will be terminated.")
+                exit(1)  # プログラムを終了
+        except urllib.error.URLError as e:
+            debug_print(f"URL error. Code: {e.reason}")
+            debug_print("Program will be terminated.")
+            exit(1)  # プログラムを終了
 
-            # html.parserでパーサーを指定してBeautifulSoupで解析
-            soup = BeautifulSoup(html_content, 'html.parser')
+        soup = BeautifulSoup(html_content, 'html.parser')
 
-            res_heads = soup.find_all("dt", class_="st-bbs_reshead")
-            res_bodys = soup.find_all("dd", class_="st-bbs_resbody")
+        res_heads = soup.find_all("dt", class_="st-bbs_reshead")
+        res_bodys = soup.find_all("dd", class_="st-bbs_resbody")
 
-            formatted_Head = []
-            formatted_Body = []
+        # 取得したレスデータ群を格納するリスト
+        article_detail_list = []
 
-            for in_idx, res_head in enumerate(res_heads):
-                debug_print("================================")
-                # debug_print("res_head = ", res_head)
+        # 1つのレスについて各種情報を入れる辞書
+        article_detail_dict = {
+            'article_id': None,
+            'resno': None,
+            'post_name': None,
+            'post_date': None,
+            'user_id': None,
+            'bodytext': None,
+            'page_url': None,
+            'deleted': None
+        }
 
-                # レス番号・投稿者名取得
-                bbs_res_no = res_head.find("span", class_="st-bbs_resNo").getText()
-                bbs_name = res_head.find("span", class_="st-bbs_name").getText()
+        # 各レス、ヘッダデータを取得
+        for in_idx, res_head in enumerate(res_heads):
 
-                # その他投稿者情報取得
-                bbs_res_Info = res_head.find("div", class_="st-bbs_resInfo")
+            # 記事ID取得（各レスに埋め込まれている値。全レスで同一のはず）
+            dt_tag = soup.find("dt", {'class': 'st-bbs_reshead'})
+            article_id = dt_tag.get('data-article_id')
 
+            # レス番号・投稿者名取得
+            bbs_res_no = res_head.find("span", class_="st-bbs_resNo").getText()
+            bbs_name = res_head.find("span", class_="st-bbs_name").getText()
+
+            # その他投稿者情報取得
+            bbs_res_Info = res_head.find("div", class_="st-bbs_resInfo")
+
+            # "削除されました"フラグ。デフォルトはFalse(削除されていない)
+            is_deleted = False
+
+            try:
                 # 投稿日時取得
                 bbs_res_info_time = bbs_res_Info.find("span", class_="bbs_resInfo_resTime").getText()
                 # bbs_res_info_time を日本語の曜日から英語の曜日に変換
-                bbs_res_info_time_en = self.convert_jp_weekday_to_en(bbs_res_info_time)
+                bbs_res_info_time_en = convert_jp_weekday_to_en(bbs_res_info_time)
                 # 変換後の文字列を datetime オブジェクトに変換
                 post_datetime = datetime.strptime(bbs_res_info_time_en, '%Y/%m/%d(%a) %H:%M:%S')
+            except ValueError:
+                bbs_res_info_time = bbs_res_Info.find("span", class_="bbs_resInfo_resTime").getText()
+                post_datetime = None
+                is_deleted = True
 
-                # 投稿者ID取得
-                bbs_res_info_id = bbs_res_Info.get_text().strip()
-                id_text = bbs_res_info_id.split('ID:')[1].strip()
-                id_text = id_text.split(' ')[0].strip()
+            # 投稿者ID取得
+            bbs_res_info_id = bbs_res_Info.get_text().strip()
+            id_text = bbs_res_info_id.split('ID:')[1].strip()
+            id_text = id_text.split(' ')[0].strip()
 
-                # debug_print("bbs_res_no = ", bbs_res_no)
-                # debug_print("bbs_name = ", bbs_name)
-                # debug_print ("bbs_res_info_time = ", post_datetime.date(), post_datetime.strftime("%a"), post_datetime.time())
-                # debug_print("id_text = ", id_text)
+            # 入手した値を辞書の各要素に格納
+            new_article_detail_dict = article_detail_dict.copy()
 
-                if in_idx == 3:
-                    break
-            
-            for in_idx, res_body in enumerate(res_bodys):
-                debug_print("================================")
-                # debug_print("res_body = ", res_body)
+            new_article_detail_dict['article_id'] = int(article_id)
+            new_article_detail_dict['resno'] = int(bbs_res_no)
+            new_article_detail_dict['post_name'] = bbs_name
+            new_article_detail_dict['post_date'] = post_datetime
+            new_article_detail_dict['user_id'] = id_text
+            new_article_detail_dict['page_url'] = page_url
+            new_article_detail_dict['deleted'] = is_deleted
 
-                b = str(res_body)
-                b = b.replace('<br>', '\n')
-                b = b.replace('<br/>', '\n')
-                b = BeautifulSoup(b, 'html.parser').getText()
+            article_detail_list.append(new_article_detail_dict)
+      
+        # 各レス、本文データを取得
+        for in_idx, res_body in enumerate(res_bodys):
 
-                b = b.strip()
-                b = b.strip('\n')
+            b = str(res_body)
+            b = b.replace('<br>', '\n')
+            b = b.replace('<br/>', '\n')
+            b = BeautifulSoup(b, 'html.parser').getText()
 
-                debug_print("body text :\n"+b)  
+            b = b.strip()
+            b = b.strip('\n')
 
-                if in_idx == 15:
-                    break
+            article_detail_list[in_idx]['bodytext'] = b
 
-            # スクレイピング間隔を空ける
-            # sleep(SCRAPING_INTERVAL)
 
-        return None
+        # スクレイピング間隔を空ける
+        sleep(SCRAPING_INTERVAL)
 
-    def convert_jp_weekday_to_en(self, date_str):
-        weekdays_jp_to_en = {
-            '(日)': '(Sun)',
-            '(月)': '(Mon)',
-            '(火)': '(Tue)',
-            '(水)': '(Wed)',
-            '(木)': '(Thu)',
-            '(金)': '(Fri)',
-            '(土)': '(Sat)'
-        }
+        # for idx, art_detail in enumerate(article_detail_list):
+        #     debug_print(f"{idx} : {article_detail_list[idx]['article_id']} , {article_detail_list[idx]['resno']}")
+
+        # 入手した最大30件のレスデータを返す。（配列に辞書データが入っている）
+        return article_detail_list
+
+    # 記事IDをキーにDB(article_detail)から一致するレコードを取得
+    def get_allrecords_by_article_id(self, article_id):
         
-        for jp, en in weekdays_jp_to_en.items():
-            date_str = date_str.replace(jp, en)
-        return date_str
+        filter_condition = and_(ArticleDetail.article_id == article_id)
+        existing_res_list = self.db.select(ArticleDetail, filter_condition).order_by(asc(ArticleDetail.resno))
 
-
+        return existing_res_list
 
     # 取得したレスデータをDBへ書き込む
     def insert_table(input_resinfo):
@@ -288,51 +368,169 @@ class NicopediScraper:
         # スクレイピング実施
         debug_print("Scraping test. URL = ", url)
 
+        # 対象記事は存在するか
         result = self.is_valid_url(url)
-
-        debug_print("isValid = ", result)
-
-        # 対象WebページのTopをスクレイプする
-        soup = self.scrape_article_top(url)
 
         # 記事が存在するかチェック 404でハンドリングできるなら不要？
         # is_exist = self.is_article_exist(soup)
 
-        # 記事タイトルを取得
-        title = self.get_title(soup)
-        debug_print("title = ["+ title +"]")
+        # 記事リスト情報収集(記事ID・タイトル・URL・最終レス番号・移動済みフラグ・新ID)
 
+        # 対象WebページのTopをスクレイプする
+        soup = self.scrape_article_top(url)
+
+        # スクレイプに失敗した場合はプログラム終了。
+        if soup == None:
+            debug_print("Failed to scrape article top.")
+            exit(1)
+
+        # 記事IDを取得
+        article_id = self.get_article_id(soup)
 
         # 記事に取得可能なレスが存在するかチェック
         result = self.is_bbs_exist(soup)
         if result == False:
             debug_print("BBS is not exist.")
             return None
+        
+        debug_print(f"Fetching ID:{article_id}...")
+
+        # 記事が既にスクレイピング済みかチェック。スクレイピング済みであれば最終レス番号を取得。
+        fetched_record = self.is_already_scraped(article_id)
+
+        # ここまで取得したList用データを格納する辞書を作成
+        # Listにデータが存在しない場合(対象記事が未スクレイピングの場合)
+        if fetched_record == None:
+            is_scraped = False
+
+            # 記事タイトルを取得
+            title = self.get_title(soup)
+
+            article_list_dict = {
+                'article_id': article_id,
+                'title': title,
+                'url': url,
+                'last_res_id': 0,
+                'moved': False,
+                'new_id': -1
+            }
+
+        # Listにデータが存在する場合(対象記事が既にスクレイピング済みの場合)
+        else:
+            is_scraped = True
+
+            article_list_dict = {
+                'article_id': article_id,
+                'title': fetched_record.title,
+                'url': fetched_record.url,
+                'last_res_id': fetched_record.last_res_id,
+                'moved': fetched_record.moved,
+                'new_id': fetched_record.new_id
+            }
+
+        debug_print("Data of article_list_dict = ", article_list_dict)
+
+        # 最後にスクレイピングした記事のページ番号を取得
+        # for idx in range(20, 30):
+        #     last_id = fibonacci(idx)
+        #     last_page = self.get_page_number_from_res_id(last_id)
+        #     debug_print(f"last_id = {last_id}, last_page = {last_page}")
+        last_got_page = self.get_page_number_from_res_id(article_list_dict['last_res_id'])
 
         # 記事の掲示板URLの最終ページ番号を取得
-        last_page = self.get_bbs_length(soup)
+        last_bbs_page = self.get_bbs_length(soup)
 
-        # 取得対象となる掲示板レスのURLリストを取得
-        all_page_urls = self.get_allpages_url(url, last_page)
-
-        # for page_url in all_page_urls:
-        #     debug_print("page_url = ", page_url)
+        # 今回スクレイピング対象となるページのURLリストを取得
+        scrape_targets = self.get_scrape_target_urls(url, last_got_page, last_bbs_page)
 
         # 記事の全レスを取得
-        all_res = self.get_allres_inpage(all_page_urls)
+        all_res = self.get_allres_from_pages(scrape_targets)
+
+        # ※Debug用。10件までに制限。 Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug 
+        all_res = all_res[:10]
+        # Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug 
+
+        # article_detailテーブルから、対象記事の全レスを取得。
+        indb_list = self.get_allrecords_by_article_id(article_id)
+
+        # Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug 
+        idxx = 0
+        for res in indb_list:
+            idxx += 1
+            debug_print("FETCHED: ", res.article_id, ':',res.resno, ':',res.bodytext[:10], '★')
+            if idxx == 10:
+                break
+        # Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug 
+
+        # 「新たに取得したレスデータ群」と「既にDBに入っているレスデータ群」を比較し、重複レコードを除外する。
+        # article_idをキーに抽出したデータ群のresnoと比較する。
+
+        # indb_listからレス番号を抽出し、別リスト化。
+        indb_resnos = [res.resno for res in indb_list]
+        # レス番号が重複している(既にDB内に存在している)レコードを重複レコードとして別リスト化。
+        duplicates = [res for res in all_res if res['resno'] in indb_resnos]
+        # レス番号が重複していないレコードを別リスト化。（all_res配列を上書きする）
+        new_insert = [res for res in all_res if res['resno'] not in indb_resnos]
+
+        # debug_print ("all_res = ", all_res)
+        # debug_print ("indb_resnos = ", indb_resnos)
+
+        # 重複レコード出力
+        for res in duplicates:
+            debug_print("DUPLICATED:", res['article_id'], ':',res['resno'], ':',res['bodytext'][:10], '★')
+        # 非重複レコード出力(DBへの書き込み対象)
+        for res in new_insert:
+            debug_print("NEW INSERT:", res['article_id'], ':',res['resno'], ':',res['bodytext'][:10], '★')
+
+        # # 新しいレコードを確認
+        # for record in all_res:
+        #     new_key = (record['article_id'], record['resno'])
+        #     debug_print("new_key = ", new_key)
+        #     if new_key in existing_keys_set:
+        #         debug_print(f"Duplicate key found: {new_key}")
+        #         duplicates.append(new_key)
+
+        # # 重複しているレコードがあれば処理
+        # if duplicates:
+        #     print(f"Found duplicate keys: {duplicates}")
+        #     # 何らかの処理を行う
+        # else:
+        #     # 重複がなければbulk_insertを実行
+        #     debug_print("No duplicate keys found.")
+        #     self.db.bulk_insert(ArticleDetail, all_res)
 
         # DBへ書き込み
+        # self.db.bulk_insert(ArticleDetail, all_res)
 
-
-
-
-#   <div class="article" id="article">
-#     「asdfas」について、まだ記事が書かれていません！
-#       <div id="div_article_create">
-
-
+        #   <div class="article" id="article">
+        #     「asdfas」について、まだ記事が書かれていません！
+        #       <div id="div_article_create">
 
         return None
+
+        # article_listへのデータ挿入    
+            # id INT AUTO_INCREMENT PRIMARY KEY,
+            # article_id INT,
+            # title VARCHAR(255) NOT NULL,
+            # url VARCHAR(255) NOT NULL,
+            # last_res_id INT,
+            # moved BOOLEAN,
+            # new_id INT
+        def insert_article_list(self, article_list):
+            return None
+
+        # article_detailへのデータ挿入
+            # article_id INT NOT NULL,
+            # resno INT NOT NULL,
+            # post_name VARCHAR(255),
+            # post_date DATETIME,
+            # user_id VARCHAR(255),
+            # bodytext TEXT,
+            # page_url VARCHAR(255),
+            # deleted BOOLEAN,
+            # PRIMARY KEY (article_id, resno)
+        def insert_article_detail(self, article_detail):
+            return None
 
     def db_access_sample(self):
         print("DB access test.")
@@ -385,8 +583,10 @@ def call_scraping():
     db = Database(db_uri)
     article_url = "https://dic.nicovideo.jp/a/asdfsdf"  # 存在しない記事
     article_url = "https://dic.nicovideo.jp/a/%E5%86%8D%E7%8F%BE" # 再現 / レス数0サンプル
-    article_url = "https://dic.nicovideo.jp/a/Linux"    # Linux / レス数100超えサンプル
     article_url = "https://dic.nicovideo.jp/a/%E5%9C%9F%E8%91%AC" # 土葬 / レス数30以下サンプル
+    article_url = "https://dic.nicovideo.jp/a/Linux"    # Linux / レス数100超えサンプル・DB登録済み
+    article_url = "https://dic.nicovideo.jp/a/Ubuntu"    # Ubuntu / DB未登録サンプル
+
 
     scraper = NicopediScraper(db)
     scraper.scrape_and_store(article_url)

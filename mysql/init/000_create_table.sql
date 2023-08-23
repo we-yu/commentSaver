@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS article_list (
     article_id INT,
     title VARCHAR(255) NOT NULL,
     url VARCHAR(255) NOT NULL,
+    last_res_id INT,
     moved BOOLEAN,
     new_id INT
 );

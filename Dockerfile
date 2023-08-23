@@ -15,9 +15,10 @@ COPY . /app
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Make port 80 available to the world outside this container
-EXPOSE 80
+# EXPOSE 80
 
 # Run scraper.py when the container launches
+# ログイン後に手動で実行するのでコメントアウト
 # CMD ["python", "scraper.py"]
 
 # Define command to start bash
