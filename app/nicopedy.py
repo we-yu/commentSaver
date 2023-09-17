@@ -14,6 +14,12 @@ import re # 正規表現用
 from time import sleep      # 待ち時間用
 from sqlalchemy import and_, or_, not_, asc, desc
 from datetime import datetime
+from dotenv import load_dotenv # .envファイルの読み込み
+load_dotenv('../.env') # 環境変数のロード
+MYSQL_DATABASE = os.environ.get("MYSQL_DATABASE")
+MYSQL_USER = os.environ.get("MYSQL_USER")
+MYSQL_PASSWORD = os.environ.get("MYSQL_PASSWORD")
+
 
 # Local
 # Set import module directory
@@ -26,6 +32,8 @@ from debug_tools import debug_print
 from db_operator import Database
 from error_handler import ErrorHandler, PROGRAM_EXIT, PROGRAM_CONTINUE
 from date_tools import convert_jp_weekday_to_en
+
+
 
 # 掲示板、1Pあたりのレス数
 RESPONSES_PER_PAGE = 30  # 1ページあたりの表示数
@@ -447,19 +455,15 @@ class NicopediScraper:
         all_res = self.get_allres_from_pages(scrape_targets)
 
         # ※Debug用。10件までに制限。 Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug 
-        all_res = all_res[:10]
+        # all_res = all_res[:10]
         # Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug 
 
         # article_detailテーブルから、対象記事の全レスを取得。
         indb_list = self.get_allrecords_by_article_id(article_id)
 
         # Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug 
-        idxx = 0
-        for res in indb_list:
-            idxx += 1
-            debug_print("FETCHED: ", res.article_id, ':',res.resno, ':',res.bodytext[:10], '★')
-            if idxx == 10:
-                break
+        # for res in indb_list:
+        #     debug_print("FETCHED: ", res.article_id, ':',res.resno, ':',res.bodytext[:10], '★')
         # Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug 
 
         # 「新たに取得したレスデータ群」と「既にDBに入っているレスデータ群」を比較し、重複レコードを除外する。
@@ -482,6 +486,34 @@ class NicopediScraper:
         for res in new_insert:
             debug_print("NEW INSERT:", res['article_id'], ':',res['resno'], ':',res['bodytext'][:10], '★')
 
+        # new_insertが空の場合(挿入すべき新しい書き込みがない)は処理終了
+        if len(new_insert) == 0:
+            debug_print("No data for new insert.")
+            return None
+        # 記事リストに挿入するため、最新のレス番号を取得する。
+        else:
+            last_resno = new_insert[-1]['resno']
+            article_list_dict['last_res_id'] = last_resno
+
+        # DBへ書き込み
+        # 既にスクレイピング済みの場合(記事リストにレコードが存在する場合)はUPDATE
+        if is_scraped:
+            debug_print("Updating existing record.")
+            filter = (ArticleList.article_id == article_id)
+            update_data = {
+                'last_res_id': article_list_dict['last_res_id'],
+                'moved': article_list_dict['moved'],
+                'new_id': article_list_dict['new_id']
+            }
+            self.db.update(ArticleList, filter, update_data)
+        
+        # 未スクレイピングの場合(記事リストにレコードが存在しない場合)はINSERT
+        else:
+            debug_print("Inserting new record.")
+            self.db.insert(ArticleList, article_list_dict)
+
+        self.db.bulk_insert(ArticleDetail, new_insert)
+
         # # 新しいレコードを確認
         # for record in all_res:
         #     new_key = (record['article_id'], record['resno'])
@@ -499,8 +531,6 @@ class NicopediScraper:
         #     debug_print("No duplicate keys found.")
         #     self.db.bulk_insert(ArticleDetail, all_res)
 
-        # DBへ書き込み
-        # self.db.bulk_insert(ArticleDetail, all_res)
 
         #   <div class="article" id="article">
         #     「asdfas」について、まだ記事が書かれていません！
@@ -578,14 +608,14 @@ def alchemy_sample(db):
 
 
 def call_scraping():
-    db_uri = 'mysql+pymysql://admin:S8n6F2a!@db_container/nico_db'
+    db_uri = f'mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}@db_container/{MYSQL_DATABASE}'
     print("db_uri = ", db_uri)
     db = Database(db_uri)
     article_url = "https://dic.nicovideo.jp/a/asdfsdf"  # 存在しない記事
     article_url = "https://dic.nicovideo.jp/a/%E5%86%8D%E7%8F%BE" # 再現 / レス数0サンプル
     article_url = "https://dic.nicovideo.jp/a/%E5%9C%9F%E8%91%AC" # 土葬 / レス数30以下サンプル
     article_url = "https://dic.nicovideo.jp/a/Linux"    # Linux / レス数100超えサンプル・DB登録済み
-    article_url = "https://dic.nicovideo.jp/a/Ubuntu"    # Ubuntu / DB未登録サンプル
+    article_url = "https://dic.nicovideo.jp/a/Ubuntu"    # Ubuntu / DB登録済み
 
 
     scraper = NicopediScraper(db)

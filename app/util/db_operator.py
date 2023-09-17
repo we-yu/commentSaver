@@ -1,5 +1,6 @@
 from sqlalchemy import create_engine, Table, MetaData
 from sqlalchemy.orm import sessionmaker
+from contextlib import contextmanager
 
 class Database:
     def __init__(self, db_uri):
@@ -10,6 +11,15 @@ class Database:
 
         Session = sessionmaker(bind=self.engine)
         self.session = Session()
+
+    @contextmanager
+    def transaction(self):
+        try:
+            yield self.session
+            self.session.commit()
+        except:
+            self.session.rollback()
+            raise
 
     def get_table(self, table_name):
         return Table(table_name, self.metadata, autoload_with=self.engine)

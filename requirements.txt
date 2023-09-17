@@ -12,3 +12,5 @@ mysql-connector-python
 colorama
 # For symbolic mathematics
 sympy
+# For read .env file
+python-dotenv
