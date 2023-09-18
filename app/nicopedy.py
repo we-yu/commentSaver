@@ -454,17 +454,8 @@ class NicopediScraper:
         # 記事の全レスを取得
         all_res = self.get_allres_from_pages(scrape_targets)
 
-        # ※Debug用。10件までに制限。 Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug 
-        # all_res = all_res[:10]
-        # Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug 
-
         # article_detailテーブルから、対象記事の全レスを取得。
         indb_list = self.get_allrecords_by_article_id(article_id)
-
-        # Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug 
-        # for res in indb_list:
-        #     debug_print("FETCHED: ", res.article_id, ':',res.resno, ':',res.bodytext[:10], '★')
-        # Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug Debug 
 
         # 「新たに取得したレスデータ群」と「既にDBに入っているレスデータ群」を比較し、重複レコードを除外する。
         # article_idをキーに抽出したデータ群のresnoと比較する。
@@ -490,7 +481,7 @@ class NicopediScraper:
         if len(new_insert) == 0:
             debug_print("No data for new insert.")
             return None
-        # 記事リストに挿入するため、最新のレス番号を取得する。
+        # 記事リスト(Article_list)に挿入するため、最新のレス番号を取得する。
         else:
             last_resno = new_insert[-1]['resno']
             article_list_dict['last_res_id'] = last_resno
