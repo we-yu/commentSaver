@@ -2,9 +2,7 @@ version: '3'
 services:
   db:
     container_name: db_container
-    build:
-      context: .
-      dockerfile: Dockerfile.MariaDB
+    build: ./build_db
     restart: always
     # ports:
     #   - "13316:3306"
@@ -23,7 +21,7 @@ services:
     tty: true
     # ports:
     #   - "10180:80"
-    build: .
+    build: ./build_scraper
     volumes:
       - .:/app
     networks:
@@ -33,15 +31,18 @@ services:
 
   api:
     container_name: api_container
-    build: ./api
+    build:
+      context: .
+      dockerfile: ./build_api/Dockerfile
     volumes:
-      - ./api:/usr/src/app
+      - ./api:/app  # apiディレクトリをマウント
     ports:
-      - "5110:5000"
+      - "5110:8000"  # ホストの5110番ポートをコンテナの8000番ポートにマッピング
     networks:
       - backend
     depends_on:
       - db
+
 
 networks:
   backend:
