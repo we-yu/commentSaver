@@ -1,7 +1,6 @@
 from fastapi import FastAPI
+from routers.api_router import router  # ルータのインポート
 
 app = FastAPI()
 
-@app.get("/")
-def read_root():
-    return {"message": "こんにちは、FastAPI!"}
+app.include_router(router)  # ルータをインクルード

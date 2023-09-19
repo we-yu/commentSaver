@@ -1,2 +1,4 @@
 fastapi==0.68.0  # 必要なバージョンに変更して
 uvicorn==0.15.0  # uvicornも入れてね
+SQLAlchemy==1.4.22  # SQLAlchemyを追加
+PyMySQL==1.0.2      # PyMySQLを追加
