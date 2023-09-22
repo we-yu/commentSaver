@@ -1,3 +1,5 @@
+import os
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -5,9 +7,13 @@ from crud import operations
 from models import pydantic_models, db_models
 from sqlalchemy.exc import OperationalError
 
+# load_dotenv('../../.env') # 環境変数のロード
+MYSQL_DATABASE = os.environ.get("MYSQL_DATABASE")
+MYSQL_USER = os.environ.get("MYSQL_USER")
+MYSQL_PASSWORD = os.environ.get("MYSQL_PASSWORD")
+
 # SQLAlchemyの設定（URLは適切なものに置き換えてください）
-# db_uri =  mysql+pymysql://admin:sarabona!@db_container/nico_db
-DATABASE_URL = "mysql+pymysql://admin:sarabona!@db_container/nico_db"
+DATABASE_URL = f'mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}@db_container/{MYSQL_DATABASE}'
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

@@ -34,6 +34,8 @@ services:
     build:
       context: .
       dockerfile: ./build_api/Dockerfile
+    env_file:
+      - .env
     volumes:
       - ./api:/app  # apiディレクトリをマウント
     ports:
