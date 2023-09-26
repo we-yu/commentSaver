@@ -4,7 +4,9 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from crud import operations
+from typing import List
 from models import pydantic_models, db_models
+from models.pydantic_models import ArticleResponse
 from sqlalchemy.exc import OperationalError
 
 # load_dotenv('../../.env') # 環境変数のロード
@@ -45,6 +47,12 @@ def test_db_connection(db: Session = Depends(get_db)):
         return {"status": "ok", "message": "Database connection successful"}
     except OperationalError:
         return {"status": "error", "message": "Database connection failed"}
+
+# 記事一覧情報を取得する
+@router.get("/article_list", response_model=List[ArticleResponse])
+def get_all_articles(db: Session = Depends(get_db)):
+    articles = operations.get_all_articles(db)
+    return articles
 
 
 @router.get("/articles")
