@@ -1,10 +1,10 @@
 import os
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from crud import operations
-from typing import List
+from typing import List, Union, Optional
 from models import pydantic_models, db_models
 from models.pydantic_models import ArticleResponse
 from sqlalchemy.exc import OperationalError
@@ -49,10 +49,29 @@ def test_db_connection(db: Session = Depends(get_db)):
         return {"status": "error", "message": "Database connection failed"}
 
 # 記事一覧情報を取得する
-@router.get("/article_list", response_model=List[ArticleResponse])
-def get_all_articles(db: Session = Depends(get_db)):
-    articles = operations.get_all_articles(db)
-    return articles
+@router.get("/article_list", response_model=Union[List[ArticleResponse], ArticleResponse])
+async def get_all_articles(
+        article_id: Optional[int] = Query(None, description="記事ID", ge=1),  # Optionalを使っている
+        title: str = Query(None, description="記事タイトル", min_length=1, max_length=255),
+        db: Session = Depends(get_db)
+    ):
+    # article_idまたはtitleが指定されている場合
+    if article_id or title:
+        # 指定された条件で記事を取得
+        db_article = operations.get_article_by_id_or_title(db, article_id, title)
+
+        # 記事が取得できた場合は、レスポンスモデルに変換して返す
+        if db_article:
+            return ArticleResponse(**db_article)
+        # 記事が取得できなかった場合は、404エラーを返す
+        else:
+            raise HTTPException(status_code=404, detail="Article not found")
+    else: # IDまたはタイトルが指定されていない場合
+        articles = operations.get_all_articles(db)
+        return [ArticleResponse(**article) for article in articles]
+
+        # articles = operations.get_all_articles(db)
+        # return articles
 
 
 @router.get("/articles")
@@ -70,3 +89,4 @@ def read_articles(name: str = Query(..., min_length=2, max_length=255)):
         }
     else:
         return {"message": "Article not found"}    
+
