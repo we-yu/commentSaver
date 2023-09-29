@@ -50,7 +50,7 @@ def test_db_connection(db: Session = Depends(get_db)):
 
 # 記事一覧情報を取得する
 @router.get("/article_list", response_model=Union[List[ArticleResponse], ArticleResponse])
-async def get_all_articles(
+async def get_article_list(
         article_id: Optional[int] = Query(None, description="記事ID", ge=1),  # Optionalを使っている
         title: str = Query(None, description="記事タイトル", min_length=1, max_length=255),
         db: Session = Depends(get_db)
@@ -58,7 +58,7 @@ async def get_all_articles(
     # article_idまたはtitleが指定されている場合
     if article_id or title:
         # 指定された条件で記事を取得
-        db_article = operations.get_article_by_id_or_title(db, article_id, title)
+        db_article = operations.find_article_list(db, article_id, title)
 
         # 記事が取得できた場合は、レスポンスモデルに変換して返す
         if db_article:

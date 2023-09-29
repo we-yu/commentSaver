@@ -24,7 +24,7 @@ def get_all_articles(db: Session):
     return articles
 
 # Article_listテーブルから、指定された条件(ID or Title)で記事を取得する
-def get_article_by_id_or_title(db: Session, article_id: Optional[int] = None, title: Optional[str] = None):
+def find_article_list(db: Session, article_id: Optional[int] = None, title: Optional[str] = None):
     if article_id:
         db_article = db.query(db_models.ArticleList).filter(db_models.ArticleList.article_id == article_id).first()
     elif title:
