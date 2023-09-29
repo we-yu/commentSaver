@@ -26,9 +26,18 @@ def get_all_articles(db: Session):
 # Article_listテーブルから、指定された条件(ID or Title)で記事を取得する
 def get_article_by_id_or_title(db: Session, article_id: Optional[int] = None, title: Optional[str] = None):
     if article_id:
-        return db.query(db_models.ArticleList).filter(db_models.ArticleList.article_id == article_id).first()
+        db_article = db.query(db_models.ArticleList).filter(db_models.ArticleList.article_id == article_id).first()
     elif title:
-        return db.query(db_models.ArticleList).filter(func.lower(db_models.ArticleList.title) == func.lower(title)).first()
+        db_article = db.query(db_models.ArticleList).filter(func.lower(db_models.ArticleList.title) == func.lower(title)).first()
+    
+    if db_article:
+        # 属性を辞書として返す
+        return {
+            "article_id": db_article.article_id,
+            "title": db_article.title,
+            "url": db_article.url
+        }
+
 
 def create_article(db: Session, article: db_models.ArticleList):
 
