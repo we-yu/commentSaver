@@ -575,6 +575,25 @@ class NicopediScraper:
 
         return None
 
+    # ScraperコンテナからAPIコンテナのAPI呼び出しテスト
+    def api_access_sample(self):
+        print("API access test.")
+        API_URL = "http://api_container:8000"
+        article_id = 430509
+        response = requests.get(f"{API_URL}/article_list", params={"article_id": article_id})
+        api_result = response.json()
+        if response.status_code == 200:
+            debug_print(api_result)
+        
+        # レコードが存在するかチェック
+        if api_result:
+            debug_print("Record is exist")
+        else:
+            debug_print("Record is not exist")
+
+        exit(1)
+        return None
+
 def alchemy_sample(db):
     print("Alchemy test.")
 
@@ -610,6 +629,9 @@ def call_scraping():
 
 
     scraper = NicopediScraper(db)
+
+    scraper.api_access_sample()
+
     scraper.scrape_and_store(article_url)
 
     return None
