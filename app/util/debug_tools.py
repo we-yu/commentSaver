@@ -16,3 +16,22 @@ DEBUG = get_debug_value_from_config()
 def debug_print(*args, **kwargs):
     if DEBUG:
         print(*args, **kwargs)
+
+import requests
+def debug_apicall():
+    # apiのホスト名とポート番号を指定します
+    url = "http://api:8000/article_list"
+
+    # オプショナル: クエリパラメータを指定する場合
+    params = {'article_id': 430509}
+
+    # GETリクエストを送信
+    response = requests.get(url, params=params)
+
+    # レスポンスを出力
+    print(response.json())
+
+if __name__ == '__main__':
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] == 'debug_apicall':
+        debug_apicall()
