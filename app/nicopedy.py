@@ -57,6 +57,14 @@ class NicopediScraper:
         # print("nico_url =", nico_url)
         is_Nicopedi_URL = targetArtURL.startswith(nico_url)
         # ---------------------------------------------------------#
+        # API_URL = "http://api_container:8000"
+        # filter_condition = {"url": targetArtURL}
+        # response = requests.get(f"{API_URL}/article_list", params=filter_condition)
+        # websites = response.json()
+
+        # if response.status_code == 200:
+        #     is_Nicopedi_URL = True
+        # ---------------------------------------------------------#
 
         return is_Nicopedi_URL
     
@@ -117,8 +125,8 @@ class NicopediScraper:
 
         return class_exists
 
-    # 記事が既にスクレイピング済みか(DB内に当該記事が存在するか)チェック。スクレイピング済みであれば最終レス番号を取得。
-    def is_already_scraped(self, article_id):
+    def is_already_scraped2(self, article_id):
+        debug_print("Func: is_already_scraped2()")
         # article_idをキーにDBから記事情報を取得
         filter_condition = ArticleList.article_id == article_id
         result = self.db.select(ArticleList, filter_condition)
@@ -146,6 +154,41 @@ class NicopediScraper:
             ErrorHandler.handle_error(None, f"Duplicate records found. article_id = {article_id}", PROGRAM_EXIT)
         else:
             # レコードが存在しない場合 = 未走査なら正常
+            debug_print("Never scraped. article_id = ", article_id)
+
+        return fetched_record
+
+    # 記事が既にスクレイピング済みか(DB内に当該記事が存在するか)チェック。スクレイピング済みであれば最終レス番号を取得
+    # APIを使ってDBから取得するように変更
+    def is_already_scraped(self, article_id):
+        debug_print ("Func: is_already_scraped()")
+        API_URL = "http://api_container:8000"
+
+        # article_idをキーにDBから記事情報を取得
+        resopnse = requests.get(f"{API_URL}/article_list", params={"article_id": article_id})
+        debug_print("resopnse = ", resopnse)
+
+        if resopnse.status_code == 200:
+            debug_print("Data exists.")
+            scraped = True
+        else:
+            debug_print("Data not exists.")
+            scraped = False
+
+        api_result = resopnse.json()
+        matched_records = len(api_result)
+
+        debug_print("api_result = ", api_result, ": matched_records = ", matched_records)
+
+        # 既にレコードが存在するか
+        fetched_record = None
+
+        if scraped:
+            fetched_record = api_result
+            # if api_result['last_res_id'] is not None:
+            #     # スクレイピング済みであれば
+            #     debug_print("Already scraped. Last res no is ", fetched_record['last_res_id'])
+        else:
             debug_print("Never scraped. article_id = ", article_id)
 
         return fetched_record
@@ -405,6 +448,12 @@ class NicopediScraper:
 
         # 記事が既にスクレイピング済みかチェック。スクレイピング済みであれば最終レス番号を取得。
         fetched_record = self.is_already_scraped(article_id)
+        fetched_record2 = self.is_already_scraped2(article_id)
+
+        debug_print("fetched_record = ", fetched_record, type(fetched_record))
+        debug_print("fetched_record2 = ", fetched_record2, type(fetched_record2))
+        # exit(1)
+
 
         # ここまで取得したList用データを格納する辞書を作成
         # Listにデータが存在しない場合(対象記事が未スクレイピングの場合)
@@ -427,16 +476,50 @@ class NicopediScraper:
         else:
             is_scraped = True
 
+            article_list_dict = fetched_record
+            # article_list_dict = {
+            #     'article_id': article_id,
+            #     'title': fetched_record.title,
+            #     'url': fetched_record.url,
+            #     'last_res_id': fetched_record.last_res_id,
+            #     'moved': fetched_record.moved,
+            #     'new_id': fetched_record.new_id
+            # }
+
+        debug_print("Data of article_list_dict(1) = ", article_list_dict)
+
+        if fetched_record2 == None:
+            is_scraped = False
+
+            # 記事タイトルを取得
+            title = self.get_title(soup)
+
             article_list_dict = {
                 'article_id': article_id,
-                'title': fetched_record.title,
-                'url': fetched_record.url,
-                'last_res_id': fetched_record.last_res_id,
-                'moved': fetched_record.moved,
-                'new_id': fetched_record.new_id
+                'title': title,
+                'url': url,
+                'last_res_id': 0,
+                'moved': False,
+                'new_id': -1
             }
 
-        debug_print("Data of article_list_dict = ", article_list_dict)
+        # Listにデータが存在する場合(対象記事が既にスクレイピング済みの場合)
+        else:
+            is_scraped = True
+
+            article_list_dict = {
+                'article_id': article_id,
+                'title': fetched_record2.title,
+                'url': fetched_record2.url,
+                'last_res_id': fetched_record2.last_res_id,
+                'moved': fetched_record2.moved,
+                'new_id': fetched_record2.new_id
+            }
+
+        debug_print("Data of article_list_dict(2) = ", article_list_dict)
+
+
+        # exit(1)
 
         # 最後にスクレイピングした記事のページ番号を取得
         # for idx in range(20, 30):
@@ -496,36 +579,14 @@ class NicopediScraper:
                 'moved': article_list_dict['moved'],
                 'new_id': article_list_dict['new_id']
             }
-            self.db.update(ArticleList, filter, update_data)
+            # self.db.update(ArticleList, filter, update_data)
         
         # 未スクレイピングの場合(記事リストにレコードが存在しない場合)はINSERT
         else:
             debug_print("Inserting new record.")
-            self.db.insert(ArticleList, article_list_dict)
+            # self.db.insert(ArticleList, article_list_dict)
 
-        self.db.bulk_insert(ArticleDetail, new_insert)
-
-        # # 新しいレコードを確認
-        # for record in all_res:
-        #     new_key = (record['article_id'], record['resno'])
-        #     debug_print("new_key = ", new_key)
-        #     if new_key in existing_keys_set:
-        #         debug_print(f"Duplicate key found: {new_key}")
-        #         duplicates.append(new_key)
-
-        # # 重複しているレコードがあれば処理
-        # if duplicates:
-        #     print(f"Found duplicate keys: {duplicates}")
-        #     # 何らかの処理を行う
-        # else:
-        #     # 重複がなければbulk_insertを実行
-        #     debug_print("No duplicate keys found.")
-        #     self.db.bulk_insert(ArticleDetail, all_res)
-
-
-        #   <div class="article" id="article">
-        #     「asdfas」について、まだ記事が書かれていません！
-        #       <div id="div_article_create">
+        # self.db.bulk_insert(ArticleDetail, new_insert)
 
         return None
 
@@ -591,7 +652,7 @@ class NicopediScraper:
         else:
             debug_print("Record is not exist")
 
-        exit(1)
+        # exit(1)
         return None
 
 def alchemy_sample(db):
@@ -621,11 +682,12 @@ def call_scraping():
     db_uri = f'mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}@db_container/{MYSQL_DATABASE}'
     print("db_uri = ", db_uri)
     db = Database(db_uri)
-    article_url = "https://dic.nicovideo.jp/a/asdfsdf"  # 存在しない記事
     article_url = "https://dic.nicovideo.jp/a/%E5%86%8D%E7%8F%BE" # 再現 / レス数0サンプル
     article_url = "https://dic.nicovideo.jp/a/%E5%9C%9F%E8%91%AC" # 土葬 / レス数30以下サンプル
+    article_url = "https://dic.nicovideo.jp/a/asdfsdf"  # 存在しない記事
     article_url = "https://dic.nicovideo.jp/a/Linux"    # Linux / レス数100超えサンプル・DB登録済み
     article_url = "https://dic.nicovideo.jp/a/Ubuntu"    # Ubuntu / DB登録済み
+
 
 
     scraper = NicopediScraper(db)

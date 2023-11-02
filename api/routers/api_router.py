@@ -60,7 +60,10 @@ async def get_article_list(
         # 指定された条件で記事を取得
         db_article = operations.find_article_list(db, article_id, title)
 
+        print("db_article =", db_article)
+
         # 記事が取得できた場合は、レスポンスモデルに変換して返す
+        # 取得項目を追加する場合は、models/pydantic_models.pyのArticleResponseの定義を変更してください
         if db_article:
             return ArticleResponse(**db_article)
         # 記事が取得できなかった場合は、404エラーを返す

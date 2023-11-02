@@ -24,7 +24,11 @@ def get_all_articles(db: Session):
     return articles
 
 # Article_listテーブルから、指定された条件(ID or Title)で記事を取得する
-def find_article_list(db: Session, article_id: Optional[int] = None, title: Optional[str] = None):
+def find_article_list(
+    db: Session,
+    article_id: Optional[int] = None,
+    title: Optional[str] = None,
+    ):
     if article_id:
         db_article = db.query(db_models.ArticleList).filter(db_models.ArticleList.article_id == article_id).first()
     elif title:
@@ -35,7 +39,10 @@ def find_article_list(db: Session, article_id: Optional[int] = None, title: Opti
         return {
             "article_id": db_article.article_id,
             "title": db_article.title,
-            "url": db_article.url
+            "url": db_article.url,
+            "last_res_id": db_article.last_res_id,
+            "moved": db_article.moved,
+            "new_id": db_article.new_id,
         }
 
 
