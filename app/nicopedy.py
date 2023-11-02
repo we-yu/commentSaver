@@ -125,39 +125,6 @@ class NicopediScraper:
 
         return class_exists
 
-    def is_already_scraped2(self, article_id):
-        debug_print("Func: is_already_scraped2()")
-        # article_idをキーにDBから記事情報を取得
-        filter_condition = ArticleList.article_id == article_id
-        result = self.db.select(ArticleList, filter_condition)
-        
-        matched_records = result.count()
-        
-        # 既にレコードが存在するかチェックする。
-
-        fetched_record = None
-
-        # 1件発見(正常)
-        if matched_records == 1:
-            # レコードが存在する場合
-            if result[0].last_res_id is not None:
-                # スクレイピング済みであれば
-                fetched_record = result[0]
-                debug_print("Already scraped. Last res no is ", fetched_record.last_res_id)
-            else:
-                # スクレイピングがまだであれば
-                scraped = False
-                last_res_no = 0 # last_res_idにNULLが設定されている場合
-        elif matched_records >= 2:
-            # レコードが2件以上存在する場合はエラー
-            # 異常ケース
-            ErrorHandler.handle_error(None, f"Duplicate records found. article_id = {article_id}", PROGRAM_EXIT)
-        else:
-            # レコードが存在しない場合 = 未走査なら正常
-            debug_print("Never scraped. article_id = ", article_id)
-
-        return fetched_record
-
     # 記事が既にスクレイピング済みか(DB内に当該記事が存在するか)チェック。スクレイピング済みであれば最終レス番号を取得
     # APIを使ってDBから取得するように変更
     def is_already_scraped(self, article_id):
@@ -448,12 +415,8 @@ class NicopediScraper:
 
         # 記事が既にスクレイピング済みかチェック。スクレイピング済みであれば最終レス番号を取得。
         fetched_record = self.is_already_scraped(article_id)
-        fetched_record2 = self.is_already_scraped2(article_id)
 
         debug_print("fetched_record = ", fetched_record, type(fetched_record))
-        debug_print("fetched_record2 = ", fetched_record2, type(fetched_record2))
-        # exit(1)
-
 
         # ここまで取得したList用データを格納する辞書を作成
         # Listにデータが存在しない場合(対象記事が未スクレイピングの場合)
@@ -486,40 +449,7 @@ class NicopediScraper:
             #     'new_id': fetched_record.new_id
             # }
 
-        debug_print("Data of article_list_dict(1) = ", article_list_dict)
-
-        if fetched_record2 == None:
-            is_scraped = False
-
-            # 記事タイトルを取得
-            title = self.get_title(soup)
-
-            article_list_dict = {
-                'article_id': article_id,
-                'title': title,
-                'url': url,
-                'last_res_id': 0,
-                'moved': False,
-                'new_id': -1
-            }
-
-        # Listにデータが存在する場合(対象記事が既にスクレイピング済みの場合)
-        else:
-            is_scraped = True
-
-            article_list_dict = {
-                'article_id': article_id,
-                'title': fetched_record2.title,
-                'url': fetched_record2.url,
-                'last_res_id': fetched_record2.last_res_id,
-                'moved': fetched_record2.moved,
-                'new_id': fetched_record2.new_id
-            }
-
-        debug_print("Data of article_list_dict(2) = ", article_list_dict)
-
-
-        # exit(1)
+        debug_print("Data of article_list_dict = ", article_list_dict)
 
         # 最後にスクレイピングした記事のページ番号を取得
         # for idx in range(20, 30):
