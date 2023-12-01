@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from crud import operations
 from typing import List, Union, Optional
 from models import pydantic_models, db_models
-from models.pydantic_models import ArticleResponse
+from models.pydantic_models import ArticleListResponse, ArticleListCreate, ArticleListUpdate
 from sqlalchemy.exc import OperationalError
 
 # load_dotenv('../../.env') # 環境変数のロード
@@ -48,8 +48,29 @@ def test_db_connection(db: Session = Depends(get_db)):
     except OperationalError:
         return {"status": "error", "message": "Database connection failed"}
 
-# 記事一覧情報を取得する
-@router.get("/article_list", response_model=Union[List[ArticleResponse], ArticleResponse])
+# CREATE:記事一覧情報を追加する
+@router.post("/article_list", response_model=ArticleListResponse)
+def insert_article_list(article: ArticleListCreate, db: Session = Depends(get_db)):
+
+    # PandanticモデルをDBモデルに変換
+    article_dict = article.dict()
+
+    print("article_dict =", article_dict)
+
+    # article_listテーブルにレコードを追加
+    db_article = operations.insert_article_list(db, **article_dict)
+
+    # Noneが返ってきた場合は、400エラーを返す
+    if db_article is None:
+        raise HTTPException(status_code=400, detail="Same article ID already exists")
+
+    # DBモデルをPandanticモデルに変換
+    res_article = ArticleListResponse(**db_article)
+
+    return res_article
+
+# READ:記事一覧情報を取得する
+@router.get("/article_list", response_model=Union[List[ArticleListResponse], ArticleListResponse])
 async def get_article_list(
         article_id: Optional[int] = Query(None, description="記事ID", ge=1),  # Optionalを使っている
         title: str = Query(None, description="記事タイトル", min_length=1, max_length=255),
@@ -63,33 +84,38 @@ async def get_article_list(
         print("db_article =", db_article)
 
         # 記事が取得できた場合は、レスポンスモデルに変換して返す
-        # 取得項目を追加する場合は、models/pydantic_models.pyのArticleResponseの定義を変更してください
+        # 取得項目を追加する場合は、models/pydantic_models.pyのArticleListResponseの定義を変更してください
         if db_article:
-            return ArticleResponse(**db_article)
+            return ArticleListResponse(**db_article)
         # 記事が取得できなかった場合は、404エラーを返す
         else:
             raise HTTPException(status_code=404, detail="Article not found")
     else: # IDまたはタイトルが指定されていない場合
         articles = operations.get_all_articles(db)
-        return [ArticleResponse(**article) for article in articles]
+        return [ArticleListResponse(**article) for article in articles]
 
         # articles = operations.get_all_articles(db)
         # return articles
 
+# UPDATE:記事一覧情報を更新する
+@router.put("/article_list/{article_id}", response_model=ArticleListResponse)
+def update_article_list(article_id: int, article: ArticleListUpdate, db: Session = Depends(get_db)):
 
-@router.get("/articles")
-# def get_article_by_name(name: str, db: Session = Depends(get_db)):
-#     db_article = operations.get_article_by_name(db, name)
-def read_articles(name: str = Query(..., min_length=2, max_length=255)):
-    if name.lower() == 'ubuntu':
-        return {
-            "article": {
-                "article_id": 123,
-                "title": "Ubuntu",
-                "url": "http://example.com/ubuntu-article",
-                "last_res_id": 456
-            }
-        }
-    else:
-        return {"message": "Article not found"}    
+    # PandanticモデルをDBモデルに変換
+    article_dict = article.dict(exclude_unset=True)
 
+    # article_listテーブルのレコードを更新
+    db_article = operations.update_article_list(db, article_id, **article_dict)
+
+    # Noneが返ってきた場合は、404エラーを返す
+    if db_article is None:
+        raise HTTPException(status_code=404, detail="Article not found")
+
+    # DBモデルをPandanticモデルに変換
+    res_article = ArticleListResponse(**db_article)
+
+    return res_article
+
+
+# DELETE:記事一覧情報を削除する
+# @router.delete("/article_list/{article_id}")

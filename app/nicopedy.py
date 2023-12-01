@@ -147,6 +147,9 @@ class NicopediScraper:
 
         debug_print("api_result = ", api_result, ": matched_records = ", matched_records)
 
+        # 処理終了
+        exit(0)
+
         # 既にレコードが存在するか
         fetched_record = None
 
@@ -585,6 +588,55 @@ class NicopediScraper:
         # exit(1)
         return None
 
+    def api_update_article_sample(self):
+        print("API update article test.")
+        API_URL = "http://api_container:8000"
+        article_id = 12436
+        update_data = {"last_res_id": 20030}
+
+        endPointURL = f"{API_URL}/article_list/{article_id}"
+
+        response = requests.put(endPointURL, json=update_data)
+
+        if response.status_code == 200:
+            api_result = response.json()
+            print("Update successful:", api_result)
+        else:
+            print("Error:", response.status_code, response.text)
+
+        return None
+
+    def api_insert_article_sample(self):
+        print("API insert article test.")
+        API_URL = "http://api_container:8000"
+        
+        # 送信する記事データのダミーを作成
+        article_data = {
+            "article_id": 12436,
+            "title": "サンプルタイトル",
+            "url": "http://example.com/sample-article",
+            "last_res_id": 123,
+            "moved": False,
+            "new_id": 456
+        }
+
+        endPointURL = f"{API_URL}/article_list"
+
+        debug_print("endPointURL = ", endPointURL)
+        
+        # POSTリクエストを送信
+        response = requests.post(endPointURL, json=article_data)
+
+        # レスポンス結果を確認
+        if response.status_code == 200:
+            api_result = response.json()
+            print("Insert successful:", api_result)
+        else:
+            print("Error:", response.status_code, response.text)
+
+        
+        return None
+
 def alchemy_sample(db):
     print("Alchemy test.")
 
@@ -622,7 +674,10 @@ def call_scraping():
 
     scraper = NicopediScraper(db)
 
-    scraper.api_access_sample()
+    # scraper.api_insert_article_sample()
+    scraper.api_update_article_sample()
+    exit(0)
+    # scraper.api_access_sample()
 
     scraper.scrape_and_store(article_url)
 
