@@ -118,4 +118,9 @@ def update_article_list(article_id: int, article: ArticleListUpdate, db: Session
 
 
 # DELETE:記事一覧情報を削除する
-# @router.delete("/article_list/{article_id}")
+@router.delete("/article_list/{article_id}", response_model=ArticleListResponse)
+def delete_article_list(article_id: int, db: Session = Depends(get_db)):
+    db_article = operations.delete_article_list(db, article_id)
+    if db_article is None:
+        raise HTTPException(status_code=404, detail="Article not found")
+    return db_article

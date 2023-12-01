@@ -588,6 +588,24 @@ class NicopediScraper:
         # exit(1)
         return None
 
+    def api_delete_article_sample(self):
+        print("API delete article test.")
+        API_URL = "http://api_container:8000"
+        article_id = 12436  # 削除したい記事のID
+
+        endPointURL = f"{API_URL}/article_list/{article_id}"
+
+        # DELETEリクエストを送信
+        response = requests.delete(endPointURL)
+
+        # レスポンス結果を確認
+        if response.status_code == 200:
+            print("Delete successful")
+        else:
+            print("Error:", response.status_code, response.text)
+
+        return None
+
     def api_update_article_sample(self):
         print("API update article test.")
         API_URL = "http://api_container:8000"
@@ -675,7 +693,8 @@ def call_scraping():
     scraper = NicopediScraper(db)
 
     # scraper.api_insert_article_sample()
-    scraper.api_update_article_sample()
+    # scraper.api_update_article_sample()
+    scraper.api_delete_article_sample()
     exit(0)
     # scraper.api_access_sample()
 

@@ -134,3 +134,26 @@ def update_article_list(
         "moved": db_article.moved,
         "new_id": db_article.new_id,
     }
+
+
+# Article_listテーブルのレコードを削除する(DELETE)
+def delete_article_list(db: Session, article_id: int):
+    db_article = db.query(db_models.ArticleList).filter(db_models.ArticleList.article_id == article_id).first()
+    if db_article:
+        # 属性を辞書として保存
+        article_data = {
+            "article_id": db_article.article_id,
+            "title": db_article.title,
+            "url": db_article.url,
+            "last_res_id": db_article.last_res_id,
+            "moved": db_article.moved,
+            "new_id": db_article.new_id,
+        }
+
+        # 記事の削除
+        db.delete(db_article)
+        db.commit()
+
+        # 削除された記事のデータを返す
+        return article_data
+    return None
