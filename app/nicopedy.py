@@ -678,25 +678,28 @@ def alchemy_sample(db):
     return None
 
 
-def call_scraping():
+def call_scraping(article_title):
     db_uri = f'mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}@db_container/{MYSQL_DATABASE}'
     print("db_uri = ", db_uri)
     db = Database(db_uri)
-    article_url = "https://dic.nicovideo.jp/a/%E5%86%8D%E7%8F%BE" # 再現 / レス数0サンプル
-    article_url = "https://dic.nicovideo.jp/a/%E5%9C%9F%E8%91%AC" # 土葬 / レス数30以下サンプル
-    article_url = "https://dic.nicovideo.jp/a/asdfsdf"  # 存在しない記事
-    article_url = "https://dic.nicovideo.jp/a/Linux"    # Linux / レス数100超えサンプル・DB登録済み
-    article_url = "https://dic.nicovideo.jp/a/Ubuntu"    # Ubuntu / DB登録済み
 
+    # URLを生成
+    article_url = f"https://dic.nicovideo.jp/a/{article_title}"
 
+    # article_url = "https://dic.nicovideo.jp/a/%E5%86%8D%E7%8F%BE" # 再現 / レス数0サンプル
+    # article_url = "https://dic.nicovideo.jp/a/%E5%9C%9F%E8%91%AC" # 土葬 / レス数30以下サンプル
+    # article_url = "https://dic.nicovideo.jp/a/asdfsdf"  # 存在しない記事
+    # article_url = "https://dic.nicovideo.jp/a/Linux"    # Linux / レス数100超えサンプル・DB登録済み
+    # article_url = "https://dic.nicovideo.jp/a/Ubuntu"    # Ubuntu / DB登録済み
 
     scraper = NicopediScraper(db)
 
+    # scraper.api_access_sample()
     # scraper.api_insert_article_sample()
     # scraper.api_update_article_sample()
-    scraper.api_delete_article_sample()
-    exit(0)
-    # scraper.api_access_sample()
+    # scraper.api_delete_article_sample()
+
+    debug_print("Scraping test. URL = ", article_url)
 
     scraper.scrape_and_store(article_url)
 
@@ -704,7 +707,12 @@ def call_scraping():
 
 if __name__ == "__main__":
     print("Called as main.")
-    call_scraping()
+    if len(sys.argv) > 1:
+        article_title = sys.argv[1]
+        call_scraping(article_title)
+    else:
+        print("No article title provided. Exiting program.")
+        sys.exit(1)
     
     # db_uri = 'mysql+pymysql://admin:S8n6F2a!@db_container/nico_db'
     # print("db_uri = ", db_uri)
