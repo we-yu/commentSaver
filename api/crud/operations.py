@@ -1,7 +1,8 @@
 from models import db_models
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from typing import Optional
+from typing import Optional, List
+from models.pydantic_models import ArticleDetailCreate
 
 def get_article_by_name(db: Session, name: str):
     return db.query(db_models.ArticleList).filter(func.lower(db_models.ArticleList.title) == func.lower(name)).first()
@@ -157,3 +158,14 @@ def delete_article_list(db: Session, article_id: int):
         # 削除された記事のデータを返す
         return article_data
     return None
+
+# Article_detailテーブルのレコードを追加する(INSERT)
+def insert_article_details(db: Session, article_details: List[ArticleDetailCreate]):
+    # Pydantic モデルから SQLAlchemy モデルへの変換
+    db_article_details = [db_models.ArticleDetail(**detail.dict()) for detail in article_details]
+
+    db.add_all(db_article_details)
+    db.commit()
+
+    # SQLAlchemy モデルから Pydantic モデルへの変換
+    return [ArticleDetailCreate.from_orm(detail) for detail in db_article_details]

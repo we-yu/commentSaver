@@ -39,6 +39,8 @@ from date_tools import convert_jp_weekday_to_en
 RESPONSES_PER_PAGE = 30  # 1ページあたりの表示数
 # スクレイピング間隔(秒)
 SCRAPING_INTERVAL = 1
+# APIコンテナのURL
+API_URL = "http://api_container:8000"
 
 class NicopediScraper:
     def __init__(self, db):
@@ -129,7 +131,6 @@ class NicopediScraper:
     # APIを使ってDBから取得するように変更
     def is_already_scraped(self, article_id):
         debug_print ("Func: is_already_scraped()")
-        API_URL = "http://api_container:8000"
 
         # article_idをキーにDBから記事情報を取得
         resopnse = requests.get(f"{API_URL}/article_list", params={"article_id": article_id})
@@ -146,9 +147,6 @@ class NicopediScraper:
         matched_records = len(api_result)
 
         debug_print("api_result = ", api_result, ": matched_records = ", matched_records)
-
-        # 処理終了
-        exit(0)
 
         # 既にレコードが存在するか
         fetched_record = None
@@ -569,10 +567,12 @@ class NicopediScraper:
 
         return None
 
+    # << Trial functions ========================================================================
+
     # ScraperコンテナからAPIコンテナのAPI呼び出しテスト
     def api_access_sample(self):
         print("API access test.")
-        API_URL = "http://api_container:8000"
+
         article_id = 430509
         response = requests.get(f"{API_URL}/article_list", params={"article_id": article_id})
         api_result = response.json()
@@ -590,7 +590,7 @@ class NicopediScraper:
 
     def api_delete_article_sample(self):
         print("API delete article test.")
-        API_URL = "http://api_container:8000"
+
         article_id = 12436  # 削除したい記事のID
 
         endPointURL = f"{API_URL}/article_list/{article_id}"
@@ -608,7 +608,7 @@ class NicopediScraper:
 
     def api_update_article_sample(self):
         print("API update article test.")
-        API_URL = "http://api_container:8000"
+
         article_id = 12436
         update_data = {"last_res_id": 20030}
 
@@ -626,7 +626,6 @@ class NicopediScraper:
 
     def api_insert_article_sample(self):
         print("API insert article test.")
-        API_URL = "http://api_container:8000"
         
         # 送信する記事データのダミーを作成
         article_data = {
@@ -654,6 +653,61 @@ class NicopediScraper:
 
         
         return None
+
+    def api_insert_article_details_sample(self):
+        print("API insert article details test.")
+        API_URL = "http://api_container:8000"
+
+        # テスト用の記事詳細データを作成
+        article_details_data = [
+            {
+                "article_id": 12436,
+                "resno": 1,
+                "post_name": "テストユーザー1",
+                "post_date": "2022-01-01T12:00:00",
+                "user_id": "user123",
+                "bodytext": "これはテストコメントです。",
+                "page_url": "http://example.com/page1",
+                "deleted": False
+            },
+            {
+                "article_id": 1334,
+                "resno": 34,
+                "post_name": "テストユーザー2",
+                "post_date": "2022-01-01T12:00:00",
+                "user_id": "usersss",
+                "bodytext": "これはテストコメントです。",
+                "page_url": "http://example.com/page1",
+                "deleted": False
+            },
+            {
+                "article_id": 11446,
+                "resno": 1,
+                "post_name": "テストユーザー3",
+                "post_date": "2022-01-01T12:00:00",
+                "user_id": "userbbb",
+                "bodytext": "これはテストコメントです。",
+                "page_url": "http://example.com/page1",
+                "deleted": False
+            },
+            # 他のレコードも同様に追加
+        ]
+
+        endPointURL = f"{API_URL}/article_details"
+
+        # POSTリクエストを送信
+        response = requests.post(endPointURL, json=article_details_data)
+
+        # レスポンス結果を確認
+        if response.status_code == 200:
+            print("Insert successful")
+        else:
+            print("Error:", response.status_code, response.text)
+
+        return None
+
+
+    # Trial functions >> ========================================================================
 
 def alchemy_sample(db):
     print("Alchemy test.")
@@ -698,6 +752,9 @@ def call_scraping(article_title):
     # scraper.api_insert_article_sample()
     # scraper.api_update_article_sample()
     # scraper.api_delete_article_sample()
+
+    scraper.api_insert_article_details_sample()
+    exit(0)
 
     debug_print("Scraping test. URL = ", article_url)
 

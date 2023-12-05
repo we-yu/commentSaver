@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from crud import operations
 from typing import List, Union, Optional
 from models import pydantic_models, db_models
-from models.pydantic_models import ArticleListResponse, ArticleListCreate, ArticleListUpdate
+from models.pydantic_models import ArticleListResponse, ArticleListCreate, ArticleListUpdate, ArticleDetailCreate
 from sqlalchemy.exc import OperationalError
 
 # load_dotenv('../../.env') # 環境変数のロード
@@ -124,3 +124,12 @@ def delete_article_list(article_id: int, db: Session = Depends(get_db)):
     if db_article is None:
         raise HTTPException(status_code=404, detail="Article not found")
     return db_article
+
+# CREATE:記事詳細情報を追加する
+@router.post("/article_details", response_model=List[ArticleDetailCreate])
+def create_article_details(article_details: List[ArticleDetailCreate], db: Session = Depends(get_db)):
+    try:
+        created_details = operations.insert_article_details(db, article_details)
+        return created_details
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
