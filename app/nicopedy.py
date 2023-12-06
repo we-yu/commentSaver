@@ -20,7 +20,6 @@ MYSQL_DATABASE = os.environ.get("MYSQL_DATABASE")
 MYSQL_USER = os.environ.get("MYSQL_USER")
 MYSQL_PASSWORD = os.environ.get("MYSQL_PASSWORD")
 
-
 # Local
 # Set import module directory
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -32,7 +31,7 @@ from debug_tools import debug_print
 from db_operator import Database
 from error_handler import ErrorHandler, PROGRAM_EXIT, PROGRAM_CONTINUE
 from date_tools import convert_jp_weekday_to_en
-
+from api_db_access import API_DB_Access
 
 
 # 掲示板、1Pあたりのレス数
@@ -45,6 +44,7 @@ API_URL = "http://api_container:8000"
 class NicopediScraper:
     def __init__(self, db):
         self.db = db
+        self.api_db_access = API_DB_Access(API_URL)
 
     # 対象が適正なニコ記事かどうかチェック.
     def is_valid_url(self, targetArtURL):
@@ -511,6 +511,7 @@ class NicopediScraper:
                 'new_id': article_list_dict['new_id']
             }
             # self.db.update(ArticleList, filter, update_data)
+            debug_print("update_data = ", update_data)
         
         # 未スクレイピングの場合(記事リストにレコードが存在しない場合)はINSERT
         else:
@@ -521,193 +522,13 @@ class NicopediScraper:
 
         return None
 
-        # article_listへのデータ挿入    
-            # id INT AUTO_INCREMENT PRIMARY KEY,
-            # article_id INT,
-            # title VARCHAR(255) NOT NULL,
-            # url VARCHAR(255) NOT NULL,
-            # last_res_id INT,
-            # moved BOOLEAN,
-            # new_id INT
-        def insert_article_list(self, article_list):
-            return None
-
-        # article_detailへのデータ挿入
-            # article_id INT NOT NULL,
-            # resno INT NOT NULL,
-            # post_name VARCHAR(255),
-            # post_date DATETIME,
-            # user_id VARCHAR(255),
-            # bodytext TEXT,
-            # page_url VARCHAR(255),
-            # deleted BOOLEAN,
-            # PRIMARY KEY (article_id, resno)
-        def insert_article_detail(self, article_detail):
-            return None
-
-    def db_access_sample(self):
-        print("DB access test.")
-
-        # SELECT
-
-        qry = "SELECT * FROM websites WHERE id = 1"
-        result = self.db.select(qry)
-        print("Fetch result = ", result)
-
-        # INSERT
-
-        insert_data = {"name": "test", "url": "https://example.com", "sub_tag1": "B", "sub_tag2": "C", "sub_tag3": "D"}
-        qry = "INSERT INTO `websites` (`name`, `url`, `sub_tag1`, `sub_tag2`, `sub_tag3`) VALUES (%(name)s, %(url)s, %(sub_tag1)s, %(sub_tag2)s, %(sub_tag3)s)"
-        print("qry = ", qry)
-        # self.db.insert(insert_data)
-
-        # qry = "SELECT * FROM websites"
-        # result = self.db.select(qry)
-        # print("Fetch result = ", result)
-
-        return None
-
-    # << Trial functions ========================================================================
-
-    # ScraperコンテナからAPIコンテナのAPI呼び出しテスト
-    def api_access_sample(self):
-        print("API access test.")
-
-        article_id = 430509
-        response = requests.get(f"{API_URL}/article_list", params={"article_id": article_id})
-        api_result = response.json()
-        if response.status_code == 200:
-            debug_print(api_result)
-        
-        # レコードが存在するかチェック
-        if api_result:
-            debug_print("Record is exist")
-        else:
-            debug_print("Record is not exist")
-
-        # exit(1)
-        return None
-
-    def api_delete_article_sample(self):
-        print("API delete article test.")
-
-        article_id = 12436  # 削除したい記事のID
-
-        endPointURL = f"{API_URL}/article_list/{article_id}"
-
-        # DELETEリクエストを送信
-        response = requests.delete(endPointURL)
-
-        # レスポンス結果を確認
-        if response.status_code == 200:
-            print("Delete successful")
-        else:
-            print("Error:", response.status_code, response.text)
-
-        return None
-
-    def api_update_article_sample(self):
-        print("API update article test.")
-
-        article_id = 12436
-        update_data = {"last_res_id": 20030}
-
-        endPointURL = f"{API_URL}/article_list/{article_id}"
-
-        response = requests.put(endPointURL, json=update_data)
-
-        if response.status_code == 200:
-            api_result = response.json()
-            print("Update successful:", api_result)
-        else:
-            print("Error:", response.status_code, response.text)
-
-        return None
-
-    def api_insert_article_sample(self):
-        print("API insert article test.")
-        
-        # 送信する記事データのダミーを作成
-        article_data = {
-            "article_id": 12436,
-            "title": "サンプルタイトル",
-            "url": "http://example.com/sample-article",
-            "last_res_id": 123,
-            "moved": False,
-            "new_id": 456
-        }
-
+    def insert_article_list(self, article_list_dict):
+        debug_print("Func: insert_article_list()")
         endPointURL = f"{API_URL}/article_list"
+        response = requests.post(endPointURL, json=article_list_dict)
+        res = response.status_code
+        return res
 
-        debug_print("endPointURL = ", endPointURL)
-        
-        # POSTリクエストを送信
-        response = requests.post(endPointURL, json=article_data)
-
-        # レスポンス結果を確認
-        if response.status_code == 200:
-            api_result = response.json()
-            print("Insert successful:", api_result)
-        else:
-            print("Error:", response.status_code, response.text)
-
-        
-        return None
-
-    def api_insert_article_details_sample(self):
-        print("API insert article details test.")
-        API_URL = "http://api_container:8000"
-
-        # テスト用の記事詳細データを作成
-        article_details_data = [
-            {
-                "article_id": 12436,
-                "resno": 1,
-                "post_name": "テストユーザー1",
-                "post_date": "2022-01-01T12:00:00",
-                "user_id": "user123",
-                "bodytext": "これはテストコメントです。",
-                "page_url": "http://example.com/page1",
-                "deleted": False
-            },
-            {
-                "article_id": 1334,
-                "resno": 34,
-                "post_name": "テストユーザー2",
-                "post_date": "2022-01-01T12:00:00",
-                "user_id": "usersss",
-                "bodytext": "これはテストコメントです。",
-                "page_url": "http://example.com/page1",
-                "deleted": False
-            },
-            {
-                "article_id": 11446,
-                "resno": 1,
-                "post_name": "テストユーザー3",
-                "post_date": "2022-01-01T12:00:00",
-                "user_id": "userbbb",
-                "bodytext": "これはテストコメントです。",
-                "page_url": "http://example.com/page1",
-                "deleted": False
-            },
-            # 他のレコードも同様に追加
-        ]
-
-        endPointURL = f"{API_URL}/article_details"
-
-        # POSTリクエストを送信
-        response = requests.post(endPointURL, json=article_details_data)
-
-        # レスポンス結果を確認
-        if response.status_code == 200:
-            print("Insert successful")
-        else:
-            print("Error:", response.status_code, response.text)
-
-        return None
-
-
-    # Trial functions >> ========================================================================
 
 def alchemy_sample(db):
     print("Alchemy test.")
@@ -749,11 +570,10 @@ def call_scraping(article_title):
     scraper = NicopediScraper(db)
 
     # scraper.api_access_sample()
-    # scraper.api_insert_article_sample()
-    # scraper.api_update_article_sample()
-    # scraper.api_delete_article_sample()
-
-    scraper.api_insert_article_details_sample()
+    scraper.api_db_access.api_insert_article_sample()
+    # scraper.api_db_access.api_update_article_sample()
+    # scraper.api_db_access.api_delete_article_sample()
+    scraper.api_db_access.api_insert_article_details_sample()
     exit(0)
 
     debug_print("Scraping test. URL = ", article_url)
