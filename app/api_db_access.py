@@ -2,12 +2,95 @@
 import requests
 from debug_tools import debug_print
 
-    # << Trial functions ========================================================================
+    
 
 class API_DB_Access:
     def __init__(self, api_url):
         self.api_url = api_url
 
+    def insert_article_list(self, article_data):
+        print("Inserting into article_list.")
+
+        # バリデーション: 必要なキーが辞書に含まれているか確認
+        required_keys = ["article_id", "title", "url", "last_res_id", "moved", "new_id"]
+        for key in required_keys:
+            if key not in article_data:
+                print(f"Error: '{key}' is missing from article data.")
+                return None
+
+        # データ型とフォーマットのチェック
+        if not isinstance(article_data["article_id"], int) or not isinstance(article_data["last_res_id"], int) or not isinstance(article_data["new_id"], int):
+            print("Error: 'article_id', 'last_res_id', 'new_id' should be integers.")
+            return None
+        if not isinstance(article_data["moved"], bool):
+            print("Error: 'moved' should be a boolean value.")
+            return None
+        if not article_data["url"].startswith("http://") and not article_data["url"].startswith("https://"):
+            print("Error: 'url' is not in valid format.")
+            return None
+
+        # APIリクエストの送信
+        endPointURL = f"{self.api_url}/article_list"
+        response = requests.post(endPointURL, json=article_data)
+
+        # レスポンスの確認
+        if response.status_code == 200:
+            print("Insert into article_list successful.")
+        else:
+            print(f"Error during API call: {response.status_code}, {response.text}")
+
+        return response
+
+    def select_article_list(self, article_id):
+        print("Selecting from article_list.")
+
+        # バリデーション: article_id が整数であることを確認
+        if not isinstance(article_id, int):
+            print("Error: 'article_id' should be an integer.")
+            return None
+
+        # APIリクエストの送信
+        endPointURL = f"{self.api_url}/article_list"
+        response = requests.get(endPointURL, params={"article_id": article_id})
+
+        # レスポンスの確認
+        if response.status_code == 200:
+            api_result = response.json()
+            print("Select from article_list successful:", api_result)
+        else:
+            print(f"Error during API call: {response.status_code}, {response.text}")
+
+        return response
+
+    def insert_article_details(self, details_data):
+        print("Inserting into article_detail.")
+
+        # バリデーション: details_data がリスト形式であることを確認
+        if not isinstance(details_data, list):
+            print("Error: 'details_data' should be a list.")
+            return None
+
+        # 各レコードのバリデーション
+        for record in details_data:
+            required_keys = ["article_id", "resno", "post_name", "post_date", "user_id", "bodytext", "page_url", "deleted"]
+            for key in required_keys:
+                if key not in record:
+                    print(f"Error: '{key}' is missing from detail record.")
+                    return None
+
+        # APIリクエストの送信
+        endPointURL = f"{self.api_url}/article_details"
+        response = requests.post(endPointURL, json=details_data)
+
+        # レスポンスの確認
+        if response.status_code == 200:
+            print("Insert into article_detail successful.")
+        else:
+            print(f"Error during API call: {response.status_code}, {response.text}")
+
+        return response
+
+    # << Trial functions ========================================================================
     def db_access_sample(self):
         print("DB access test.")
 
@@ -186,6 +269,5 @@ class API_DB_Access:
             print("Error:", response.status_code, response.text)
 
         return None
-
 
     # Trial functions >> ========================================================================
