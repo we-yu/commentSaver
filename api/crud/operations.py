@@ -2,7 +2,7 @@ from models import db_models
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import Optional, List
-from models.pydantic_models import ArticleDetailCreate
+from models.pydantic_models import ArticleDetailCreate, ArticleDetailResponse
 
 def get_article_by_name(db: Session, name: str):
     return db.query(db_models.ArticleList).filter(func.lower(db_models.ArticleList.title) == func.lower(name)).first()
@@ -169,3 +169,8 @@ def insert_article_details(db: Session, article_details: List[ArticleDetailCreat
 
     # SQLAlchemy モデルから Pydantic モデルへの変換
     return [ArticleDetailCreate.from_orm(detail) for detail in db_article_details]
+
+# Article_detailテーブルのレコードを取得する(READ)
+def get_article_details(db: Session, article_id: int) -> List[ArticleDetailResponse]:
+    details = db.query(db_models.ArticleDetail).filter(db_models.ArticleDetail.article_id == article_id).all()
+    return [ArticleDetailResponse.from_orm(detail) for detail in details]

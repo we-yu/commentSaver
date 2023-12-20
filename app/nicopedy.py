@@ -133,17 +133,17 @@ class NicopediScraper:
         debug_print ("Func: is_already_scraped()")
 
         # article_idをキーにDBから記事情報を取得
-        resopnse = requests.get(f"{API_URL}/article_list", params={"article_id": article_id})
-        debug_print("resopnse = ", resopnse)
+        response = self.api_db_access.select_article_list(article_id)
+        debug_print("response = ", response)
 
-        if resopnse.status_code == 200:
+        if response.status_code == 200:
             debug_print("Data exists.")
             scraped = True
         else:
             debug_print("Data not exists.")
             scraped = False
 
-        api_result = resopnse.json()
+        api_result = response.json()
         matched_records = len(api_result)
 
         debug_print("api_result = ", api_result, ": matched_records = ", matched_records)
@@ -405,6 +405,7 @@ class NicopediScraper:
 
         # 記事IDを取得
         article_id = self.get_article_id(soup)
+        article_id = int(article_id)
 
         # 記事に取得可能なレスが存在するかチェック
         result = self.is_bbs_exist(soup)
@@ -436,6 +437,9 @@ class NicopediScraper:
                 'new_id': -1
             }
 
+            # 新たに挿入する記事のタイトルを表示
+            debug_print("New article title = ", article_list_dict['title'])
+
         # Listにデータが存在する場合(対象記事が既にスクレイピング済みの場合)
         else:
             is_scraped = True
@@ -449,6 +453,9 @@ class NicopediScraper:
             #     'moved': fetched_record.moved,
             #     'new_id': fetched_record.new_id
             # }
+
+            # 既にスクレイピング済みの記事のタイトルを表示
+            debug_print("Existing article title = ", article_list_dict['title'])
 
         debug_print("Data of article_list_dict = ", article_list_dict)
 
@@ -570,10 +577,36 @@ def call_scraping(article_title):
     scraper = NicopediScraper(db)
 
     # scraper.api_access_sample()
-    scraper.api_db_access.api_insert_article_sample()
+    # scraper.api_db_access.api_insert_article_sample()
     # scraper.api_db_access.api_update_article_sample()
     # scraper.api_db_access.api_delete_article_sample()
-    scraper.api_db_access.api_insert_article_details_sample()
+    # scraper.api_db_access.api_insert_article_details_sample()
+    response = scraper.api_db_access.api_read_article_details_sample(12436)
+
+    # ステータスコードが200の場合、レスポンスの内容を確認
+    if response.status_code == 200:
+        # JSONレスポンスを取得
+        data = response.json()
+        
+        # データがリスト形式であることを確認（複数件のデータを取得しているため）
+        if isinstance(data, list):
+            # 取得した各レコードの詳細を表示
+            for item in data:
+                print(f"Article ID: {item.get('article_id', 'N/A')}")
+                print(f"Res No: {item.get('resno', 'N/A')}")
+                print(f"Post Name: {item.get('post_name', 'N/A')}")
+                print(f"Post Date: {item.get('post_date', 'N/A')}")
+                print(f"User ID: {item.get('user_id', 'N/A')}")
+                print(f"Body Text: {item.get('bodytext', 'N/A')}")
+                print(f"Page URL: {item.get('page_url', 'N/A')}")
+                print(f"Deleted: {item.get('deleted', 'N/A')}")
+                print("-" * 30)  # レコード間を区切るための線
+        else:
+            print("Data format is not a list as expected.")
+    else:
+        print(f"Failed to fetch details. Status code: {response.status_code}")
+        print(f"Response text: {response.text}")
+    
     exit(0)
 
     debug_print("Scraping test. URL = ", article_url)

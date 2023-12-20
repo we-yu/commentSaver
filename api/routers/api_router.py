@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from crud import operations
 from typing import List, Union, Optional
 from models import pydantic_models, db_models
-from models.pydantic_models import ArticleListResponse, ArticleListCreate, ArticleListUpdate, ArticleDetailCreate
+from models.pydantic_models import ArticleListResponse, ArticleListCreate, ArticleListUpdate, ArticleDetailCreate, ArticleDetailResponse
 from sqlalchemy.exc import OperationalError
 
 # load_dotenv('../../.env') # 環境変数のロード
@@ -133,3 +133,11 @@ def create_article_details(article_details: List[ArticleDetailCreate], db: Sessi
         return created_details
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+# READ:記事詳細情報を取得する
+@router.get("/article_details/{article_id}", response_model=List[ArticleDetailResponse])
+def get_article_details(article_id: int, db: Session = Depends(get_db)):
+    details = operations.get_article_details(db, article_id)
+    if not details:
+        raise HTTPException(status_code=404, detail="Article details not found")
+    return details

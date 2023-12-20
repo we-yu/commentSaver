@@ -8,6 +8,9 @@ class API_DB_Access:
     def __init__(self, api_url):
         self.api_url = api_url
 
+
+    # ArticleList用のAPI関数 -----------------------------------------------------------------------
+
     def insert_article_list(self, article_data):
         print("Inserting into article_list.")
 
@@ -62,6 +65,8 @@ class API_DB_Access:
 
         return response
 
+    # ArticleDetail用のAPI関数 ---------------------------------------------------------------------
+
     def insert_article_details(self, details_data):
         print("Inserting into article_detail.")
 
@@ -87,6 +92,30 @@ class API_DB_Access:
             print("Insert into article_detail successful.")
         else:
             print(f"Error during API call: {response.status_code}, {response.text}")
+
+        return response
+    
+    def select_article_details(self, article_id):
+        debug_print("Selecting from article_detail.")
+
+        # バリデーション: article_id が整数であることを確認
+        if not isinstance(article_id, int):
+            debug_print("Error: 'article_id' should be an integer.")
+            return None
+
+        # APIリクエストの送信
+        # endPointURL = f"{self.api_url}/article_details"
+        # response = requests.get(endPointURL, params={"article_id": article_id})
+
+        endPointURL = f"{self.api_url}/article_details/{article_id}"
+        response = requests.get(endPointURL)
+
+        # レスポンスの確認
+        if response.status_code == 200:
+            api_result = response.json()
+            debug_print("Select from article_detail successful:", api_result)
+        else:
+            debug_print(f"Error during API call: {response.status_code}, {response.text}")
 
         return response
 
@@ -215,8 +244,8 @@ class API_DB_Access:
                 "deleted": False
             },
             {
-                "article_id": 12436,
-                "resno": 2,
+                "article_id": 14436,
+                "resno": 1,
                 "post_name": "テストユーザー2",
                 "post_date": "2022-01-02T13:00:00",
                 "user_id": "user234",
@@ -225,8 +254,8 @@ class API_DB_Access:
                 "deleted": False
             },
             {
-                "article_id": 12436,
-                "resno": 3,
+                "article_id": 14436,
+                "resno": 2,
                 "post_name": "テストユーザー3",
                 "post_date": "2022-01-03T14:00:00",
                 "user_id": "user345",
@@ -235,8 +264,8 @@ class API_DB_Access:
                 "deleted": False
             },
             {
-                "article_id": 12436,
-                "resno": 4,
+                "article_id": 33436,
+                "resno": 1,
                 "post_name": "テストユーザー4",
                 "post_date": "2022-01-04T15:00:00",
                 "user_id": "user456",
@@ -245,8 +274,8 @@ class API_DB_Access:
                 "deleted": False
             },
             {
-                "article_id": 12436,
-                "resno": 5,
+                "article_id": 33436,
+                "resno": 2,
                 "post_name": "テストユーザー5",
                 "post_date": "2022-01-05T16:00:00",
                 "user_id": "user567",
@@ -269,5 +298,22 @@ class API_DB_Access:
             print("Error:", response.status_code, response.text)
 
         return None
+
+
+    def api_read_article_details_sample(self, article_id):
+        print(f"API read article details test for article_id={article_id}.")
+
+        # APIリクエストの送信
+        response = self.select_article_details(article_id)
+
+        # レスポンス結果を確認
+        if response.status_code == 200:
+            api_result = response.json()
+            print("Read from article_detail successful:", api_result)
+        else:
+            print(f"Error during API call: {response.status_code}, {response.text}")
+
+        return response
+
 
     # Trial functions >> ========================================================================

@@ -52,3 +52,16 @@ class ArticleDetailCreate(BaseModel):
 
     class Config:
         orm_mode = True
+
+class ArticleDetailResponse(BaseModel):
+    article_id: int
+    resno: int
+    post_name: Optional[str] = None
+    post_date: Optional[datetime] = None
+    user_id: Optional[str] = None
+    bodytext: Optional[str] = None
+    page_url: Optional[HttpUrl] = None
+    deleted: Optional[bool] = None
+
+    class Config:
+        orm_mode = True
