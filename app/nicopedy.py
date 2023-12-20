@@ -166,6 +166,13 @@ class NicopediScraper:
         # Titleが含まれるクラスを取得
         article_title = soup.find("div", class_="a-title")
 
+        # リダイレクトされた場合は終了
+        meta_refresh = soup.find('meta', attrs={'http-equiv': 'refresh'})
+        if meta_refresh:
+            redirected = True
+            print_red('This article is redirected.', is_bold=True)
+            sys.exit(0)
+
         # 不要な情報の除去
         if article_title.find('span', class_='st-label_title-category') != None :
             article_title.find('span', class_='st-label_title-category').decompose()
@@ -175,6 +182,9 @@ class NicopediScraper:
             article_title.find('div', class_='a-title-article-text-count-wrap').decompose()
         if article_title.find('ul', class_='article-title-counter') != None :
             article_title.find('ul', class_='article-title-counter').decompose()
+
+        # 大百科仕様変更への対応
+        article_title = article_title.find('a', class_='self_link')
 
         # 残ったテキストから前後の空白と開業をトリム。後処理の簡便化のためスペースをアンダーバーに置換。
         article_title = article_title.getText()
@@ -377,6 +387,32 @@ class NicopediScraper:
         filter_condition = and_(ArticleDetail.article_id == article_id)
         existing_res_list = self.db.select(ArticleDetail, filter_condition).order_by(asc(ArticleDetail.resno))
 
+        ii = 0
+        for existing_res in existing_res_list:
+            debug_print("1 existing_res = ", existing_res.article_id, ':', existing_res.resno, ':', existing_res.bodytext[:10], '★')
+            ii += 1
+            if ii > 20:
+                break
+
+        print("Type Alchemy", type(existing_res_list))
+
+        existing_res_list2 = self.api_db_access.select_article_details(article_id).json()
+        ii = 0
+        for existing_res in existing_res_list2:
+            debug_print("2 existing_res = ", existing_res['article_id'], ':', existing_res['resno'], ':', existing_res['bodytext'][:10], '★')
+            ii += 1
+            if ii > 20:
+                break
+
+        print("Type Query", type(existing_res_list))
+        print("Type API", type(existing_res_list2))
+
+        if existing_res_list == existing_res_list2:
+            print("両方のリストは同じ内容です。")
+        else:
+            print("リストの内容が異なります。")
+        exit(0)
+
         return existing_res_list
 
     # 取得したレスデータをDBへ書き込む
@@ -438,7 +474,7 @@ class NicopediScraper:
             }
 
             # 新たに挿入する記事のタイトルを表示
-            debug_print("New article title = ", article_list_dict['title'])
+            debug_print("This is new article.")
 
         # Listにデータが存在する場合(対象記事が既にスクレイピング済みの場合)
         else:
@@ -455,7 +491,7 @@ class NicopediScraper:
             # }
 
             # 既にスクレイピング済みの記事のタイトルを表示
-            debug_print("Existing article title = ", article_list_dict['title'])
+            debug_print("This is existing article.")
 
         debug_print("Data of article_list_dict = ", article_list_dict)
 
@@ -472,11 +508,17 @@ class NicopediScraper:
         # 今回スクレイピング対象となるページのURLリストを取得
         scrape_targets = self.get_scrape_target_urls(url, last_got_page, last_bbs_page)
 
+        # for each_url in scrape_targets:
+        #     debug_print("Scraping target URL = ", each_url)
+        
+
         # 記事の全レスを取得
         all_res = self.get_allres_from_pages(scrape_targets)
 
         # article_detailテーブルから、対象記事の全レスを取得。
         indb_list = self.get_allrecords_by_article_id(article_id)
+        for res in indb_list:
+            debug_print("INDATABASE:", res.article_id, ':',res.resno, ':',res.bodytext[:10], '★')
 
         # 「新たに取得したレスデータ群」と「既にDBに入っているレスデータ群」を比較し、重複レコードを除外する。
         # article_idをキーに抽出したデータ群のresnoと比較する。
@@ -517,8 +559,8 @@ class NicopediScraper:
                 'moved': article_list_dict['moved'],
                 'new_id': article_list_dict['new_id']
             }
-            # self.db.update(ArticleList, filter, update_data)
             debug_print("update_data = ", update_data)
+            # self.db.update(ArticleList, filter, update_data)
         
         # 未スクレイピングの場合(記事リストにレコードが存在しない場合)はINSERT
         else:
@@ -583,31 +625,6 @@ def call_scraping(article_title):
     # scraper.api_db_access.api_insert_article_details_sample()
     response = scraper.api_db_access.api_read_article_details_sample(12436)
 
-    # ステータスコードが200の場合、レスポンスの内容を確認
-    if response.status_code == 200:
-        # JSONレスポンスを取得
-        data = response.json()
-        
-        # データがリスト形式であることを確認（複数件のデータを取得しているため）
-        if isinstance(data, list):
-            # 取得した各レコードの詳細を表示
-            for item in data:
-                print(f"Article ID: {item.get('article_id', 'N/A')}")
-                print(f"Res No: {item.get('resno', 'N/A')}")
-                print(f"Post Name: {item.get('post_name', 'N/A')}")
-                print(f"Post Date: {item.get('post_date', 'N/A')}")
-                print(f"User ID: {item.get('user_id', 'N/A')}")
-                print(f"Body Text: {item.get('bodytext', 'N/A')}")
-                print(f"Page URL: {item.get('page_url', 'N/A')}")
-                print(f"Deleted: {item.get('deleted', 'N/A')}")
-                print("-" * 30)  # レコード間を区切るための線
-        else:
-            print("Data format is not a list as expected.")
-    else:
-        print(f"Failed to fetch details. Status code: {response.status_code}")
-        print(f"Response text: {response.text}")
-    
-    exit(0)
 
     debug_print("Scraping test. URL = ", article_url)
 

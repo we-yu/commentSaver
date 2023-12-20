@@ -113,7 +113,7 @@ class API_DB_Access:
         # レスポンスの確認
         if response.status_code == 200:
             api_result = response.json()
-            debug_print("Select from article_detail successful:", api_result)
+            debug_print("Select from article_detail successful: Fetched", len(api_result), "records.")
         else:
             debug_print(f"Error during API call: {response.status_code}, {response.text}")
 
@@ -310,6 +310,23 @@ class API_DB_Access:
         if response.status_code == 200:
             api_result = response.json()
             print("Read from article_detail successful:", api_result)
+
+            data = response.json()
+            # データがリスト形式であることを確認（複数件のデータを取得しているため）
+            if isinstance(data, list):
+                # 取得した各レコードの詳細を表示
+                for item in data:
+                    print(f"Article ID: {item.get('article_id', 'N/A')}")
+                    print(f"Res No: {item.get('resno', 'N/A')}")
+                    print(f"Post Name: {item.get('post_name', 'N/A')}")
+                    print(f"Post Date: {item.get('post_date', 'N/A')}")
+                    print(f"User ID: {item.get('user_id', 'N/A')}")
+                    print(f"Body Text: {item.get('bodytext', 'N/A')}")
+                    print(f"Page URL: {item.get('page_url', 'N/A')}")
+                    print(f"Deleted: {item.get('deleted', 'N/A')}")
+                    print("-" * 30)  # レコード間を区切るための線
+            else:
+                print("Data format is not a list as expected.")
         else:
             print(f"Error during API call: {response.status_code}, {response.text}")
 

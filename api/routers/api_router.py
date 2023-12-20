@@ -48,6 +48,7 @@ def test_db_connection(db: Session = Depends(get_db)):
     except OperationalError:
         return {"status": "error", "message": "Database connection failed"}
 
+# CRUD処理 for article_list --------------------------------------------------
 # CREATE:記事一覧情報を追加する
 @router.post("/article_list", response_model=ArticleListResponse)
 def insert_article_list(article: ArticleListCreate, db: Session = Depends(get_db)):
@@ -124,6 +125,8 @@ def delete_article_list(article_id: int, db: Session = Depends(get_db)):
     if db_article is None:
         raise HTTPException(status_code=404, detail="Article not found")
     return db_article
+
+# CRUD処理 for article_detail --------------------------------------------------
 
 # CREATE:記事詳細情報を追加する
 @router.post("/article_details", response_model=List[ArticleDetailCreate])
