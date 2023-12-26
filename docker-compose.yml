@@ -45,6 +45,19 @@ services:
     depends_on:
       - db
 
+  phpmyadmin:
+    container_name: phpmyadmin
+    image: phpmyadmin/phpmyadmin
+    restart: always
+    ports:
+      - "18081:80"  # phpMyAdmin をホストの8080ポートで公開
+    environment:
+      PMA_HOST: db  # MariaDBのサービス名（コンテナ名ではない）を指定
+      PMA_USER: ${MYSQL_USER}  # 環境変数からMariaDBのユーザー名を取得
+      PMA_PASSWORD: ${MYSQL_PASSWORD}  # 環境変数からパスワードを取得
+    networks:
+      - backend
+
 
 networks:
   backend:
