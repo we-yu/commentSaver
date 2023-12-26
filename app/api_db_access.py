@@ -8,7 +8,6 @@ class API_DB_Access:
     def __init__(self, api_url):
         self.api_url = api_url
 
-
     # ArticleList用のAPI関数 -----------------------------------------------------------------------
 
     def insert_article_list(self, article_data):
@@ -60,6 +59,45 @@ class API_DB_Access:
         if response.status_code == 200:
             api_result = response.json()
             print("Select from article_list successful:", api_result)
+        else:
+            print(f"Error during API call: {response.status_code}, {response.text}")
+
+        return response
+
+    def update_article_list(self, article_id, update_data):
+        print(f"Updating article_list for article_id={article_id}.")
+
+        # データ型とフォーマットのチェック（必要に応じて）
+        if not isinstance(article_id, int):
+            print("Error: 'article_id' should be an integer.")
+            return None
+
+        # APIリクエストの送信
+        endPointURL = f"{self.api_url}/article_list/{article_id}"
+        response = requests.put(endPointURL, json=update_data)
+
+        # レスポンスの確認
+        if response.status_code == 200:
+            print(f"Update article_list successful for article_id={article_id}.")
+        else:
+            print(f"Error during API call: {response.status_code}, {response.text}")
+
+        return response
+
+    def delete_article_list(self, article_id):
+        print(f"Deleting article_list for article_id={article_id}.")
+
+        if not isinstance(article_id, int):
+            print("Error: 'article_id' should be an integer.")
+            return None
+
+        # APIリクエストの送信
+        endPointURL = f"{self.api_url}/article_list/{article_id}"
+        response = requests.delete(endPointURL)
+
+        # レスポンスの確認
+        if response.status_code == 200:
+            print(f"Delete article_list successful for article_id={article_id}.")
         else:
             print(f"Error during API call: {response.status_code}, {response.text}")
 
@@ -165,67 +203,68 @@ class API_DB_Access:
     def api_delete_article_sample(self):
         print("API delete article test.")
 
-        article_id = 12436  # 削除したい記事のID
+        # Linuxのarticle_idを指定
+        article_id = 473859  # Linux記事のID
 
-        endPointURL = f"{self.api_url}/article_list/{article_id}"
-
-        # DELETEリクエストを送信
-        response = requests.delete(endPointURL)
+        # DELETE処理を実行
+        response = self.delete_article_list(article_id)
 
         # レスポンス結果を確認
-        if response.status_code == 200:
-            print("Delete successful")
+        if response and response.status_code == 200:
+            print("Delete successful for Linux article.")
         else:
-            print("Error:", response.status_code, response.text)
+            print("Delete failed for Linux article.")
+
 
         return None
 
     def api_update_article_sample(self):
         print("API update article test.")
 
-        article_id = 12436
-        update_data = {"last_res_id": 20030}
+        # Linuxのarticle_idを指定
+        article_id = 473859  # Linux記事のID
 
-        endPointURL = f"{self.api_url}/article_list/{article_id}"
+        # 更新データを指定
+        update_data = {
+            "last_res_id": 200,  # 仮の値
+            "moved": True,
+            "new_id": 474000  # 仮の値
+        }
 
-        response = requests.put(endPointURL, json=update_data)
+        # UPDATE処理を実行
+        response = self.update_article_list(article_id, update_data)
 
-        if response.status_code == 200:
-            api_result = response.json()
-            print("Update successful:", api_result)
+        # レスポンス結果を確認
+        if response and response.status_code == 200:
+            print("Update successful for Linux article.")
         else:
-            print("Error:", response.status_code, response.text)
+            print("Update failed for Linux article.")
 
         return None
 
     def api_insert_article_sample(self):
         print("API insert article test.")
-        
-        # 送信する記事データのダミーを作成
+
+        # 挿入する記事データを指定
         article_data = {
-            "article_id": 12436,
-            "title": "サンプルタイトル",
-            "url": "http://example.com/sample-article",
-            "last_res_id": 123,
+            "article_id": 473859,  # Linux記事のID
+            "title": "Linux",
+            "url": "https://dic.nicovideo.jp/a/linux",
+            "last_res_id": 145,
             "moved": False,
-            "new_id": 456
+            "new_id": -1
         }
 
-        endPointURL = f"{self.api_url}/article_list"
-
-        debug_print("endPointURL = ", endPointURL)
-        
-        # POSTリクエストを送信
-        response = requests.post(endPointURL, json=article_data)
+        # INSERT処理を実行
+        response = self.insert_article_list(article_data)
 
         # レスポンス結果を確認
-        if response.status_code == 200:
-            api_result = response.json()
-            print("Insert successful:", api_result)
+        if response and response.status_code == 200:
+            print("Insert successful for Linux article.")
         else:
-            print("Error:", response.status_code, response.text)
+            print("Insert failed for Linux article.")
         
-        return response
+        return None
 
     def api_insert_article_details_sample(self):
         print("API insert article details test.")

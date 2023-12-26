@@ -3,7 +3,7 @@ import os
 
 import requests
 from requests.packages.urllib3.util import ssl_
-
+from urllib.parse import quote
 import urllib.request
 import ssl
 
@@ -74,6 +74,7 @@ class NicopediScraper:
     def scrape_article_top(self, url):
         ####################################################
         # http://yamori-jp.blogspot.com/2022/09/python-ssl-unsafelegacyrenegotiationdis.html
+
         ctx = ssl.create_default_context()
         ctx.options |= 0x4
         # 対象記事が存在しない場合のハンドリング
@@ -335,6 +336,7 @@ class NicopediScraper:
                 bbs_res_info_time_en = convert_jp_weekday_to_en(bbs_res_info_time)
                 # 変換後の文字列を datetime オブジェクトに変換
                 post_datetime = datetime.strptime(bbs_res_info_time_en, '%Y/%m/%d(%a) %H:%M:%S')
+                post_datetime = post_datetime.isoformat()
             except ValueError:
                 bbs_res_info_time = bbs_res_Info.find("span", class_="bbs_resInfo_resTime").getText()
                 post_datetime = None
@@ -384,34 +386,36 @@ class NicopediScraper:
     # 記事IDをキーにDB(article_detail)から一致するレコードを取得
     def get_allrecords_by_article_id(self, article_id):
         
-        filter_condition = and_(ArticleDetail.article_id == article_id)
-        existing_res_list = self.db.select(ArticleDetail, filter_condition).order_by(asc(ArticleDetail.resno))
+        # filter_condition = and_(ArticleDetail.article_id == article_id)
+        # existing_res_list = self.db.select(ArticleDetail, filter_condition).order_by(asc(ArticleDetail.resno))
 
-        ii = 0
-        for existing_res in existing_res_list:
-            debug_print("1 existing_res = ", existing_res.article_id, ':', existing_res.resno, ':', existing_res.bodytext[:10], '★')
-            ii += 1
-            if ii > 20:
-                break
+        # ii = 0
+        # for existing_res in existing_res_list:
+        #     debug_print("1 existing_res = ", existing_res.article_id, ':', existing_res.resno, ':', existing_res.bodytext[:10], '★')
+        #     ii += 1
+        #     if ii > 20:
+        #         break
 
-        print("Type Alchemy", type(existing_res_list))
+        # print("Type Alchemy", type(existing_res_list))
 
-        existing_res_list2 = self.api_db_access.select_article_details(article_id).json()
-        ii = 0
-        for existing_res in existing_res_list2:
-            debug_print("2 existing_res = ", existing_res['article_id'], ':', existing_res['resno'], ':', existing_res['bodytext'][:10], '★')
-            ii += 1
-            if ii > 20:
-                break
+        # existing_res_list2 = self.api_db_access.select_article_details(article_id).json()
+        # ii = 0
+        # for existing_res in existing_res_list2:
+        #     debug_print("2 existing_res = ", existing_res['article_id'], ':', existing_res['resno'], ':', existing_res['bodytext'][:10], '★')
+        #     ii += 1
+        #     if ii > 20:
+        #         break
 
-        print("Type Query", type(existing_res_list))
-        print("Type API", type(existing_res_list2))
+        # print("Type Query", type(existing_res_list))
+        # print("Type API", type(existing_res_list2))
 
-        if existing_res_list == existing_res_list2:
-            print("両方のリストは同じ内容です。")
-        else:
-            print("リストの内容が異なります。")
-        exit(0)
+        # if existing_res_list == existing_res_list2:
+        #     print("両方のリストは同じ内容です。")
+        # else:
+        #     print("リストの内容が異なります。")
+        # exit(0)
+
+        existing_res_list = self.api_db_access.select_article_details(article_id)
 
         return existing_res_list
 
@@ -420,9 +424,13 @@ class NicopediScraper:
         return None
 
     def scrape_and_store(self, url):
-        # スクレイピング実施
-        debug_print("Scraping test. URL = ", url)
+        # URLをエンコード
+        encoded_url = quote(url, safe='/:?=&')
+        debug_print("Scraping test. URL = ", url, "encoded_url = ", encoded_url)
+        url = encoded_url
 
+        # スクレイピング実施
+        
         # 対象記事は存在するか
         result = self.is_valid_url(url)
 
@@ -510,28 +518,37 @@ class NicopediScraper:
 
         # for each_url in scrape_targets:
         #     debug_print("Scraping target URL = ", each_url)
-        
-
+    
         # 記事の全レスを取得
         all_res = self.get_allres_from_pages(scrape_targets)
 
-        # article_detailテーブルから、対象記事の全レスを取得。
-        indb_list = self.get_allrecords_by_article_id(article_id)
-        for res in indb_list:
-            debug_print("INDATABASE:", res.article_id, ':',res.resno, ':',res.bodytext[:10], '★')
+        # 新規記事の場合、indb_list(DBに存在するデータ)は存在せず、空白となる。
+        # 既存記事の場合、article_detailテーブルから記事IDに合致する全レコードを引っ張り、indb_list(DBに存在するデータ)に設定する。
 
+        indb_list = []
+
+        if is_scraped:
+            # article_detailテーブルから、対象記事の全レスを取得。
+            response = self.get_allrecords_by_article_id(article_id)
+
+            if response.status_code == 200:
+                # detailテーブルからの取得が成功したなら既にDBに存在するレコードを取得
+                indb_list = response.json()
+            else:
+                # detailテーブルからの取得が失敗したならindb_listは空にする。
+                indb_list = []
+                # 異常ケースのため、警告ログ表示。
+                debug_print("Article is existing. But failed to get records from detail table.")
+            
         # 「新たに取得したレスデータ群」と「既にDBに入っているレスデータ群」を比較し、重複レコードを除外する。
         # article_idをキーに抽出したデータ群のresnoと比較する。
 
         # indb_listからレス番号を抽出し、別リスト化。
-        indb_resnos = [res.resno for res in indb_list]
+        indb_resnos = [record['resno'] for record in indb_list]
         # レス番号が重複している(既にDB内に存在している)レコードを重複レコードとして別リスト化。
         duplicates = [res for res in all_res if res['resno'] in indb_resnos]
         # レス番号が重複していないレコードを別リスト化。（all_res配列を上書きする）
         new_insert = [res for res in all_res if res['resno'] not in indb_resnos]
-
-        # debug_print ("all_res = ", all_res)
-        # debug_print ("indb_resnos = ", indb_resnos)
 
         # 重複レコード出力
         for res in duplicates:
@@ -544,10 +561,10 @@ class NicopediScraper:
         if len(new_insert) == 0:
             debug_print("No data for new insert.")
             return None
+        
         # 記事リスト(Article_list)に挿入するため、最新のレス番号を取得する。
-        else:
-            last_resno = new_insert[-1]['resno']
-            article_list_dict['last_res_id'] = last_resno
+        last_resno = new_insert[-1]['resno']
+        article_list_dict['last_res_id'] = last_resno
 
         # DBへ書き込み
         # 既にスクレイピング済みの場合(記事リストにレコードが存在する場合)はUPDATE
@@ -561,13 +578,17 @@ class NicopediScraper:
             }
             debug_print("update_data = ", update_data)
             # self.db.update(ArticleList, filter, update_data)
+            self.api_db_access.update_article_list(article_id, update_data)
         
         # 未スクレイピングの場合(記事リストにレコードが存在しない場合)はINSERT
         else:
-            debug_print("Inserting new record.")
+            debug_print("Inserting new record =", article_list_dict)
             # self.db.insert(ArticleList, article_list_dict)
+            self.api_db_access.insert_article_list(article_list_dict)
 
+        debug_print("Inserting new records for Detail =", new_insert)
         # self.db.bulk_insert(ArticleDetail, new_insert)
+        self.api_db_access.insert_article_details(new_insert)
 
         return None
 
@@ -609,6 +630,7 @@ def call_scraping(article_title):
 
     # URLを生成
     article_url = f"https://dic.nicovideo.jp/a/{article_title}"
+    debug_print("Scraping test. URL = ", article_url)
 
     # article_url = "https://dic.nicovideo.jp/a/%E5%86%8D%E7%8F%BE" # 再現 / レス数0サンプル
     # article_url = "https://dic.nicovideo.jp/a/%E5%9C%9F%E8%91%AC" # 土葬 / レス数30以下サンプル
@@ -622,11 +644,9 @@ def call_scraping(article_title):
     # scraper.api_db_access.api_insert_article_sample()
     # scraper.api_db_access.api_update_article_sample()
     # scraper.api_db_access.api_delete_article_sample()
+
     # scraper.api_db_access.api_insert_article_details_sample()
-    response = scraper.api_db_access.api_read_article_details_sample(12436)
-
-
-    debug_print("Scraping test. URL = ", article_url)
+    # response = scraper.api_db_access.api_read_article_details_sample(12436)
 
     scraper.scrape_and_store(article_url)
 

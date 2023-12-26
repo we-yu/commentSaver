@@ -24,7 +24,7 @@ class ArticleListCreate(BaseModel):
             raise ValueError('must not be None')
         return v
 
-    @validator('article_id', 'last_res_id', 'new_id')
+    @validator('article_id', 'last_res_id')
     def must_be_positive(cls, v):
         if v < 0:
             raise ValueError('must be positive')
