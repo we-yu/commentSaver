@@ -1,4 +1,5 @@
 from models import db_models
+from models.db_models import Website, Config
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import Optional, List
@@ -174,3 +175,17 @@ def insert_article_details(db: Session, article_details: List[ArticleDetailCreat
 def get_article_details(db: Session, article_id: int) -> List[ArticleDetailResponse]:
     details = db.query(db_models.ArticleDetail).filter(db_models.ArticleDetail.article_id == article_id).all()
     return [ArticleDetailResponse.from_orm(detail) for detail in details]
+
+def get_config(db: Session, config_type: str):
+    return db.query(Config).filter(Config.config_type == config_type).first()
+
+def get_website_by_name(db: Session, name: str):
+    return db.query(Website).filter(Website.name == name).first()
+
+def create_website(db: Session, website_data):
+    db_website = Website(**website_data)
+    db.add(db_website)
+    db.commit()
+    db.refresh(db_website)
+    return db_website
+

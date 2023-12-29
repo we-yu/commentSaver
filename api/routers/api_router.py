@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from crud import operations
 from typing import List, Union, Optional
 from models import pydantic_models, db_models
-from models.pydantic_models import ArticleListResponse, ArticleListCreate, ArticleListUpdate, ArticleDetailCreate, ArticleDetailResponse
+from models.pydantic_models import ArticleListResponse, ArticleListCreate, ArticleListUpdate, ArticleDetailCreate, ArticleDetailResponse, ConfigResponse, WebsiteResponse
 from sqlalchemy.exc import OperationalError
 
 # load_dotenv('../../.env') # 環境変数のロード
@@ -144,3 +144,34 @@ def get_article_details(article_id: int, db: Session = Depends(get_db)):
     if not details:
         raise HTTPException(status_code=404, detail="Article details not found")
     return details
+
+@router.get("/config/{config_type}", response_model=ConfigResponse)
+async def get_config(config_type: str, db: Session = Depends(get_db)):
+    db_config = operations.get_config(db, config_type)
+    if db_config is None:
+        raise HTTPException(status_code=404, detail="Config not found")
+    
+    # db_config オブジェクトを ConfigResponse モデルに変換
+    config_response = ConfigResponse(
+        id=db_config.id,
+        category=db_config.category,
+        config_type=db_config.config_type,
+        value=db_config.value
+    )
+    return config_response
+
+@router.get("/websites/{name}", response_model=WebsiteResponse)
+def get_website(name: str, db: Session = Depends(get_db)):
+    db_website = operations.get_website_by_name(db, name)
+    if db_website is None:
+        raise HTTPException(status_code=404, detail="Website not found")
+    
+    # db_website オブジェクトを WebsiteResponse モデルに変換
+    website_response = WebsiteResponse(
+        name=db_website.name,
+        url=db_website.url,
+        sub_tag1=db_website.sub_tag1,
+        sub_tag2=db_website.sub_tag2,
+        sub_tag3=db_website.sub_tag3
+    )
+    return website_response

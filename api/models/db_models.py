@@ -13,6 +13,7 @@ class Config(Base):
     __tablename__ = 'scrape_config'
 
     id = Column(Integer, primary_key=True)
+    category = Column(String)
     config_type = Column(String)
     value = Column(String)
 

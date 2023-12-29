@@ -2,14 +2,11 @@
 import requests
 from debug_tools import debug_print
 
-    
-
 class API_DB_Access:
     def __init__(self, api_url):
         self.api_url = api_url
 
     # ArticleList用のAPI関数 -----------------------------------------------------------------------
-
     def insert_article_list(self, article_data):
         print("Inserting into article_list.")
 
@@ -104,7 +101,6 @@ class API_DB_Access:
         return response
 
     # ArticleDetail用のAPI関数 ---------------------------------------------------------------------
-
     def insert_article_details(self, details_data):
         print("Inserting into article_detail.")
 
@@ -155,6 +151,19 @@ class API_DB_Access:
         else:
             debug_print(f"Error during API call: {response.status_code}, {response.text}")
 
+        return response
+
+    # 設定値用のAPI関数 ---------------------------------------------------------------------------
+    def get_config(self, config_type):
+        response = requests.get(f"{self.api_url}/config/{config_type}")
+        if response.status_code == 200:
+            return response.json()
+        else:
+            debug_print(f"Failed to get config data for {config_type}. Status code: {response.status_code}")
+            return None
+
+    def select_website_by_name(self, name):
+        response = requests.get(f"{self.api_url}/websites/{name}")
         return response
 
     # << Trial functions ========================================================================

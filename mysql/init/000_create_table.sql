@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS titles (
 
 CREATE TABLE IF NOT EXISTS scrape_config (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    category VARCHAR(255) NOT NULL,
     config_type VARCHAR(255) NOT NULL,
     value VARCHAR(255) NOT NULL
 );

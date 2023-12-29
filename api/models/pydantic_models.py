@@ -65,3 +65,16 @@ class ArticleDetailResponse(BaseModel):
 
     class Config:
         orm_mode = True
+
+class ConfigResponse(BaseModel):
+    id: int
+    category: str
+    config_type: str
+    value: str
+
+class WebsiteResponse(BaseModel):
+    name: str
+    url: str
+    sub_tag1: str
+    sub_tag2: Optional[str] = None  # None を許可する
+    sub_tag3: Optional[str] = None  # None を許可する

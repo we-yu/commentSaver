@@ -49,24 +49,15 @@ class NicopediScraper:
     # 対象が適正なニコ記事かどうかチェック.
     def is_valid_url(self, targetArtURL):
 
-        # ニコニコ記事のURLかどうかチェック ----------------------------#
-        # DBからニコニコ記事のURLを取得
-        filter_condition = and_(Website.name == "Niconico")
-        # print("fileter condition =", filter_condition)
-        websites = self.db.select(Website, filter_condition)
-        # print("websites =", websites)
-        nico_url = websites[0].url
-        # print("nico_url =", nico_url)
+        response = self.api_db_access.select_website_by_name("Niconico")
+        if response.status_code != 200:
+            debug_print("Failed to get website data.")
+            return False
+        website_data = response.json()
+        nico_url = website_data['url']
         is_Nicopedi_URL = targetArtURL.startswith(nico_url)
-        # ---------------------------------------------------------#
-        # API_URL = "http://api_container:8000"
-        # filter_condition = {"url": targetArtURL}
-        # response = requests.get(f"{API_URL}/article_list", params=filter_condition)
-        # websites = response.json()
 
-        # if response.status_code == 200:
-        #     is_Nicopedi_URL = True
-        # ---------------------------------------------------------#
+        debug_print("nicopedia_url = ", nico_url)
 
         return is_Nicopedi_URL
     
@@ -117,9 +108,17 @@ class NicopediScraper:
     # 渡したsoupデータ内に、tagで指定したクラスが存在するかチェック
     def is_exist_target_class(self, soup, tag):
         # tagを手掛かりに、DBからクラス名を取得
-        filter_condition = and_(Config.config_type == tag)
-        configs = self.db.select(Config, filter_condition)
-        config_value = configs[0].value
+        # filter_condition = and_(Config.config_type == tag)
+        # configs = self.db.select(Config, filter_condition)
+        # config_value = configs[0].value
+        # debug_print("config value 1 =", config_value)
+
+        config_data = self.api_db_access.get_config(tag)
+        if not config_data:
+            debug_print("Failed to get config data :", tag)
+            return None
+
+        config_value = config_data['value']
 
         # 引っ張ってきたクラスが存在するかチェック（存在する場合はTrueを返す）
         class_exists = soup.find(class_=config_value) != None
@@ -431,8 +430,11 @@ class NicopediScraper:
 
         # スクレイピング実施
         
-        # 対象記事は存在するか
+        # 対象がニコニコ大百科のURLかをチェック
         result = self.is_valid_url(url)
+        if result == False:
+            print("Invalid URL.")
+            return None
 
         # 記事が存在するかチェック 404でハンドリングできるなら不要？
         # is_exist = self.is_article_exist(soup)
