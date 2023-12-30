@@ -3,7 +3,7 @@ from models.db_models import Website, Config
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import Optional, List
-from models.pydantic_models import ArticleDetailCreate, ArticleDetailResponse
+from models.pydantic_models import ArticleDetailCreate, ArticleDetailResponse, WebsiteResponse
 
 def get_article_by_name(db: Session, name: str):
     return db.query(db_models.ArticleList).filter(func.lower(db_models.ArticleList.title) == func.lower(name)).first()
@@ -48,7 +48,7 @@ def find_article_list(
         }
 
 # Article_listテーブルに、新しい記事を追加する(INSERT)
-def insert_article_list(
+def create_article_list(
     db: Session,
     article_id: int,
     title: str,
@@ -176,11 +176,15 @@ def get_article_details(db: Session, article_id: int) -> List[ArticleDetailRespo
     details = db.query(db_models.ArticleDetail).filter(db_models.ArticleDetail.article_id == article_id).all()
     return [ArticleDetailResponse.from_orm(detail) for detail in details]
 
-def get_config(db: Session, config_type: str):
+def read_config_by_type(db: Session, config_type: str):
     return db.query(Config).filter(Config.config_type == config_type).first()
 
-def get_website_by_name(db: Session, name: str):
-    return db.query(Website).filter(Website.name == name).first()
+def get_website_by_name(db: Session, name: str) -> WebsiteResponse:
+    db_website = db.query(Website).filter(Website.name == name).first()
+    if db_website:
+        # SQLAlchemy オブジェクトを Pydantic モデルに変換
+        return WebsiteResponse.from_orm(db_website)
+    return None
 
 def create_website(db: Session, website_data):
     db_website = Website(**website_data)

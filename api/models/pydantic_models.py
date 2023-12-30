@@ -78,3 +78,6 @@ class WebsiteResponse(BaseModel):
     sub_tag1: str
     sub_tag2: Optional[str] = None  # None を許可する
     sub_tag3: Optional[str] = None  # None を許可する
+    class Config:
+        orm_mode = True  # この行を追加
+

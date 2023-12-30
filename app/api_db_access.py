@@ -7,7 +7,7 @@ class API_DB_Access:
         self.api_url = api_url
 
     # ArticleList用のAPI関数 -----------------------------------------------------------------------
-    def insert_article_list(self, article_data):
+    def create_article_list(self, article_data):
         print("Inserting into article_list.")
 
         # バリデーション: 必要なキーが辞書に含まれているか確認
@@ -40,7 +40,7 @@ class API_DB_Access:
 
         return response
 
-    def select_article_list(self, article_id):
+    def read_article_list_by_id(self, article_id):
         print("Selecting from article_list.")
 
         # バリデーション: article_id が整数であることを確認
@@ -154,7 +154,7 @@ class API_DB_Access:
         return response
 
     # 設定値用のAPI関数 ---------------------------------------------------------------------------
-    def get_config(self, config_type):
+    def read_config_by_type(self, config_type):
         response = requests.get(f"{self.api_url}/config/{config_type}")
         if response.status_code == 200:
             return response.json()
@@ -162,7 +162,7 @@ class API_DB_Access:
             debug_print(f"Failed to get config data for {config_type}. Status code: {response.status_code}")
             return None
 
-    def select_website_by_name(self, name):
+    def read_website_by_name(self, name):
         response = requests.get(f"{self.api_url}/websites/{name}")
         return response
 
@@ -191,7 +191,7 @@ class API_DB_Access:
 
 
     # ScraperコンテナからAPIコンテナのAPI呼び出しテスト
-    def api_access_sample(self):
+    def test_api_access(self):
         print("API access test.")
 
         article_id = 430509
@@ -209,7 +209,7 @@ class API_DB_Access:
         # exit(1)
         return None
 
-    def api_delete_article_sample(self):
+    def test_delete_article(self):
         print("API delete article test.")
 
         # Linuxのarticle_idを指定
@@ -227,7 +227,7 @@ class API_DB_Access:
 
         return None
 
-    def api_update_article_sample(self):
+    def test_update_article(self):
         print("API update article test.")
 
         # Linuxのarticle_idを指定
@@ -251,7 +251,7 @@ class API_DB_Access:
 
         return None
 
-    def api_insert_article_sample(self):
+    def test_create_article(self):
         print("API insert article test.")
 
         # 挿入する記事データを指定
@@ -265,7 +265,7 @@ class API_DB_Access:
         }
 
         # INSERT処理を実行
-        response = self.insert_article_list(article_data)
+        response = self.create_article_list(article_data)
 
         # レスポンス結果を確認
         if response and response.status_code == 200:
@@ -275,7 +275,7 @@ class API_DB_Access:
         
         return None
 
-    def api_insert_article_details_sample(self):
+    def test_create_article_details(self):
         print("API insert article details test.")
         self.api_url = "http://api_container:8000"
 

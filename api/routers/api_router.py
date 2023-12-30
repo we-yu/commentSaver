@@ -51,7 +51,7 @@ def test_db_connection(db: Session = Depends(get_db)):
 # CRUD処理 for article_list --------------------------------------------------
 # CREATE:記事一覧情報を追加する
 @router.post("/article_list", response_model=ArticleListResponse)
-def insert_article_list(article: ArticleListCreate, db: Session = Depends(get_db)):
+def create_article_list(article: ArticleListCreate, db: Session = Depends(get_db)):
 
     # PandanticモデルをDBモデルに変換
     article_dict = article.dict()
@@ -59,7 +59,7 @@ def insert_article_list(article: ArticleListCreate, db: Session = Depends(get_db
     print("article_dict =", article_dict)
 
     # article_listテーブルにレコードを追加
-    db_article = operations.insert_article_list(db, **article_dict)
+    db_article = operations.create_article_list(db, **article_dict)
 
     # Noneが返ってきた場合は、400エラーを返す
     if db_article is None:
@@ -72,7 +72,7 @@ def insert_article_list(article: ArticleListCreate, db: Session = Depends(get_db
 
 # READ:記事一覧情報を取得する
 @router.get("/article_list", response_model=Union[List[ArticleListResponse], ArticleListResponse])
-async def get_article_list(
+async def read_all_article_lists(
         article_id: Optional[int] = Query(None, description="記事ID", ge=1),  # Optionalを使っている
         title: str = Query(None, description="記事タイトル", min_length=1, max_length=255),
         db: Session = Depends(get_db)
@@ -146,8 +146,8 @@ def get_article_details(article_id: int, db: Session = Depends(get_db)):
     return details
 
 @router.get("/config/{config_type}", response_model=ConfigResponse)
-async def get_config(config_type: str, db: Session = Depends(get_db)):
-    db_config = operations.get_config(db, config_type)
+async def read_config_by_type(config_type: str, db: Session = Depends(get_db)):
+    db_config = operations.read_config_by_type(db, config_type)
     if db_config is None:
         raise HTTPException(status_code=404, detail="Config not found")
     
@@ -162,16 +162,7 @@ async def get_config(config_type: str, db: Session = Depends(get_db)):
 
 @router.get("/websites/{name}", response_model=WebsiteResponse)
 def get_website(name: str, db: Session = Depends(get_db)):
-    db_website = operations.get_website_by_name(db, name)
-    if db_website is None:
+    website_response = operations.get_website_by_name(db, name)
+    if website_response is None:
         raise HTTPException(status_code=404, detail="Website not found")
-    
-    # db_website オブジェクトを WebsiteResponse モデルに変換
-    website_response = WebsiteResponse(
-        name=db_website.name,
-        url=db_website.url,
-        sub_tag1=db_website.sub_tag1,
-        sub_tag2=db_website.sub_tag2,
-        sub_tag3=db_website.sub_tag3
-    )
     return website_response
