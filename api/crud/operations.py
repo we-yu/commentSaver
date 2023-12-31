@@ -44,7 +44,7 @@ def find_article_list(
             "url": db_article.url,
             "last_res_id": db_article.last_res_id,
             "moved": db_article.moved,
-            "new_id": db_article.new_id,
+            "new_article_title": db_article.new_article_title,
         }
 
 # Article_listテーブルに、新しい記事を追加する(INSERT)
@@ -55,7 +55,7 @@ def create_article_list(
     url: str,
     last_res_id: int,
     moved: bool,
-    new_id: int,
+    new_article_title: str,
     ):
 
     # Validation
@@ -73,7 +73,7 @@ def create_article_list(
         url=url,
         last_res_id=last_res_id,
         moved=moved,
-        new_id=new_id,
+        new_article_title=new_article_title,
     )
 
     # セッションに追加
@@ -92,7 +92,7 @@ def create_article_list(
         "url": new_article_record.url,
         "last_res_id": new_article_record.last_res_id,
         "moved": new_article_record.moved,
-        "new_id": new_article_record.new_id,
+        "new_article_title": new_article_record.new_article_title,
     }
 
 # 他のCRUD処理
@@ -105,7 +105,7 @@ def update_article_list(
     url: Optional[str] = None,
     last_res_id: Optional[int] = None,
     moved: Optional[bool] = None,
-    new_id: Optional[int] = None,
+    new_article_title: Optional[str] = None,
 ):
     # 既存の記事を取得
     db_article = db.query(db_models.ArticleList).filter(db_models.ArticleList.article_id == article_id).first()
@@ -119,7 +119,7 @@ def update_article_list(
     if url is not None: db_article.url = url
     if last_res_id is not None: db_article.last_res_id = last_res_id
     if moved is not None: db_article.moved = moved
-    if new_id is not None: db_article.new_id = new_id
+    if new_article_title is not None: db_article.new_article_title = new_article_title
 
     # 変更をコミット
     db.commit()
@@ -134,7 +134,7 @@ def update_article_list(
         "url": db_article.url,
         "last_res_id": db_article.last_res_id,
         "moved": db_article.moved,
-        "new_id": db_article.new_id,
+        "new_article_title": db_article.new_article_title,
     }
 
 
@@ -149,7 +149,7 @@ def delete_article_list(db: Session, article_id: int):
             "url": db_article.url,
             "last_res_id": db_article.last_res_id,
             "moved": db_article.moved,
-            "new_id": db_article.new_id,
+            "new_article_title": db_article.new_article_title,
         }
 
         # 記事の削除

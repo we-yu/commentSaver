@@ -477,7 +477,7 @@ class NicopediScraper:
                 'url': url,
                 'last_res_id': 0,
                 'moved': False,
-                'new_id': -1
+                'new_article_title': None
             }
 
             # 新たに挿入する記事のタイトルを表示
@@ -494,7 +494,7 @@ class NicopediScraper:
             #     'url': fetched_record.url,
             #     'last_res_id': fetched_record.last_res_id,
             #     'moved': fetched_record.moved,
-            #     'new_id': fetched_record.new_id
+            #     'new_article_title': fetched_record.new_article_title
             # }
 
             # 既にスクレイピング済みの記事のタイトルを表示
@@ -584,22 +584,22 @@ class NicopediScraper:
             update_data = {
                 'last_res_id': article_list_dict['last_res_id'],
                 'moved': article_list_dict['moved'],
-                'new_id': article_list_dict['new_id']
+                'new_article_title': article_list_dict['new_article_title']
             }
             # debug_print("update_data = ", update_data)
             # self.db.update(ArticleList, filter, update_data)
-            # self.api_db_access.update_article_list(article_id, update_data)
+            self.api_db_access.update_article_list(article_id, update_data)
         
         # 未スクレイピングの場合(記事リストにレコードが存在しない場合)はINSERT
         else:
             debug_print("Inserting new record =", article_list_dict)
             # self.db.insert(ArticleList, article_list_dict)
-            # self.api_db_access.create_article_list(article_list_dict)
+            self.api_db_access.create_article_list(article_list_dict)
 
         # self.db.bulk_insert(ArticleDetail, new_insert)
 
         debug_print("Inserting new records for Detail, record length is ", len(new_insert))
-        # self.api_db_access.insert_article_details(new_insert)
+        self.api_db_access.insert_article_details(new_insert)
 
         return None
 
@@ -657,7 +657,9 @@ def call_scraping(article_title):
     # scraper.api_db_access.test_delete_article()
 
     # scraper.api_db_access.test_create_article_details()
-    # response = scraper.api_db_access.api_read_article_details_sample(12436)
+    # response = scraper.api_db_access.api_read_article_details_sample(4567890)
+
+    # exit(0)
 
     scraper.scrape_and_store(article_url)
 

@@ -11,15 +11,15 @@ class API_DB_Access:
         print("Inserting into article_list.")
 
         # バリデーション: 必要なキーが辞書に含まれているか確認
-        required_keys = ["article_id", "title", "url", "last_res_id", "moved", "new_id"]
+        required_keys = ["article_id", "title", "url", "last_res_id", "moved", "new_article_title"]
         for key in required_keys:
             if key not in article_data:
                 print(f"Error: '{key}' is missing from article data.")
                 return None
 
         # データ型とフォーマットのチェック
-        if not isinstance(article_data["article_id"], int) or not isinstance(article_data["last_res_id"], int) or not isinstance(article_data["new_id"], int):
-            print("Error: 'article_id', 'last_res_id', 'new_id' should be integers.")
+        if not isinstance(article_data["article_id"], int) or not isinstance(article_data["last_res_id"], int):
+            print("Error: 'article_id', 'last_res_id' should be integers.")
             return None
         if not isinstance(article_data["moved"], bool):
             print("Error: 'moved' should be a boolean value.")
@@ -237,7 +237,7 @@ class API_DB_Access:
         update_data = {
             "last_res_id": 200,  # 仮の値
             "moved": True,
-            "new_id": 474000  # 仮の値
+            "new_article_title": "474000-article"  # 仮の値
         }
 
         # UPDATE処理を実行
@@ -261,7 +261,7 @@ class API_DB_Access:
             "url": "https://dic.nicovideo.jp/a/linux",
             "last_res_id": 145,
             "moved": False,
-            "new_id": -1
+            "new_article_title": None
         }
 
         # INSERT処理を実行
@@ -282,7 +282,7 @@ class API_DB_Access:
         # テスト用の記事詳細データを作成
         article_details_data = [
             {
-                "article_id": 12436,
+                "article_id": 20002345,
                 "resno": 1,
                 "post_name": "テストユーザー1",
                 "post_date": "2022-01-01T12:00:00",
@@ -292,7 +292,7 @@ class API_DB_Access:
                 "deleted": False
             },
             {
-                "article_id": 14436,
+                "article_id": 4567890,
                 "resno": 1,
                 "post_name": "テストユーザー2",
                 "post_date": "2022-01-02T13:00:00",
@@ -302,7 +302,7 @@ class API_DB_Access:
                 "deleted": False
             },
             {
-                "article_id": 14436,
+                "article_id": 4567890,
                 "resno": 2,
                 "post_name": "テストユーザー3",
                 "post_date": "2022-01-03T14:00:00",
@@ -312,7 +312,7 @@ class API_DB_Access:
                 "deleted": False
             },
             {
-                "article_id": 33436,
+                "article_id": 5678,
                 "resno": 1,
                 "post_name": "テストユーザー4",
                 "post_date": "2022-01-04T15:00:00",
@@ -322,7 +322,7 @@ class API_DB_Access:
                 "deleted": False
             },
             {
-                "article_id": 33436,
+                "article_id": 5678,
                 "resno": 2,
                 "post_name": "テストユーザー5",
                 "post_date": "2022-01-05T16:00:00",

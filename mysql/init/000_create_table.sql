@@ -18,12 +18,12 @@ CREATE TABLE IF NOT EXISTS scrape_config (
 
 CREATE TABLE IF NOT EXISTS article_list (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    article_id INT,
+    article_id INT UNIQUE,
     title VARCHAR(255) NOT NULL,
     url VARCHAR(255) NOT NULL,
     last_res_id INT,
     moved BOOLEAN,
-    new_id INT
+    new_article_title VARCHAR(1023)
 );
 
 CREATE TABLE IF NOT EXISTS article_detail (
@@ -35,7 +35,8 @@ CREATE TABLE IF NOT EXISTS article_detail (
     bodytext TEXT,
     page_url VARCHAR(255),
     deleted BOOLEAN,
-    PRIMARY KEY (article_id, resno)
+    PRIMARY KEY (article_id, resno),
+    FOREIGN KEY (article_id) REFERENCES article_list(article_id)
 );
 
 CREATE TABLE IF NOT EXISTS websites (
