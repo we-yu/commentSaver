@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from crud import operations
 from typing import List, Union, Optional
 from models import pydantic_models, db_models
-from models.pydantic_models import ArticleListResponse, ArticleListCreate, ArticleListUpdate, ArticleDetailCreate, ArticleDetailResponse
+from models.pydantic_models import ArticleListResponse, ArticleListCreate, ArticleListUpdate, ArticleDetailCreate, ArticleDetailResponse, ConfigResponse, WebsiteResponse
 from sqlalchemy.exc import OperationalError
 
 # load_dotenv('../../.env') # 環境変数のロード
@@ -51,7 +51,7 @@ def test_db_connection(db: Session = Depends(get_db)):
 # CRUD処理 for article_list --------------------------------------------------
 # CREATE:記事一覧情報を追加する
 @router.post("/article_list", response_model=ArticleListResponse)
-def insert_article_list(article: ArticleListCreate, db: Session = Depends(get_db)):
+def create_article_list(article: ArticleListCreate, db: Session = Depends(get_db)):
 
     # PandanticモデルをDBモデルに変換
     article_dict = article.dict()
@@ -59,7 +59,7 @@ def insert_article_list(article: ArticleListCreate, db: Session = Depends(get_db
     print("article_dict =", article_dict)
 
     # article_listテーブルにレコードを追加
-    db_article = operations.insert_article_list(db, **article_dict)
+    db_article = operations.create_article_list(db, **article_dict)
 
     # Noneが返ってきた場合は、400エラーを返す
     if db_article is None:
@@ -72,7 +72,7 @@ def insert_article_list(article: ArticleListCreate, db: Session = Depends(get_db
 
 # READ:記事一覧情報を取得する
 @router.get("/article_list", response_model=Union[List[ArticleListResponse], ArticleListResponse])
-async def get_article_list(
+async def read_all_article_lists(
         article_id: Optional[int] = Query(None, description="記事ID", ge=1),  # Optionalを使っている
         title: str = Query(None, description="記事タイトル", min_length=1, max_length=255),
         db: Session = Depends(get_db)
@@ -144,3 +144,25 @@ def get_article_details(article_id: int, db: Session = Depends(get_db)):
     if not details:
         raise HTTPException(status_code=404, detail="Article details not found")
     return details
+
+@router.get("/config/{config_type}", response_model=ConfigResponse)
+async def read_config_by_type(config_type: str, db: Session = Depends(get_db)):
+    db_config = operations.read_config_by_type(db, config_type)
+    if db_config is None:
+        raise HTTPException(status_code=404, detail="Config not found")
+    
+    # db_config オブジェクトを ConfigResponse モデルに変換
+    config_response = ConfigResponse(
+        id=db_config.id,
+        category=db_config.category,
+        config_type=db_config.config_type,
+        value=db_config.value
+    )
+    return config_response
+
+@router.get("/websites/{name}", response_model=WebsiteResponse)
+def get_website(name: str, db: Session = Depends(get_db)):
+    website_response = operations.get_website_by_name(db, name)
+    if website_response is None:
+        raise HTTPException(status_code=404, detail="Website not found")
+    return website_response

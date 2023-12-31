@@ -1,8 +1,9 @@
 from models import db_models
+from models.db_models import Website, Config
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import Optional, List
-from models.pydantic_models import ArticleDetailCreate, ArticleDetailResponse
+from models.pydantic_models import ArticleDetailCreate, ArticleDetailResponse, WebsiteResponse
 
 def get_article_by_name(db: Session, name: str):
     return db.query(db_models.ArticleList).filter(func.lower(db_models.ArticleList.title) == func.lower(name)).first()
@@ -43,18 +44,18 @@ def find_article_list(
             "url": db_article.url,
             "last_res_id": db_article.last_res_id,
             "moved": db_article.moved,
-            "new_id": db_article.new_id,
+            "new_article_title": db_article.new_article_title,
         }
 
 # Article_listテーブルに、新しい記事を追加する(INSERT)
-def insert_article_list(
+def create_article_list(
     db: Session,
     article_id: int,
     title: str,
     url: str,
     last_res_id: int,
     moved: bool,
-    new_id: int,
+    new_article_title: str,
     ):
 
     # Validation
@@ -72,7 +73,7 @@ def insert_article_list(
         url=url,
         last_res_id=last_res_id,
         moved=moved,
-        new_id=new_id,
+        new_article_title=new_article_title,
     )
 
     # セッションに追加
@@ -91,7 +92,7 @@ def insert_article_list(
         "url": new_article_record.url,
         "last_res_id": new_article_record.last_res_id,
         "moved": new_article_record.moved,
-        "new_id": new_article_record.new_id,
+        "new_article_title": new_article_record.new_article_title,
     }
 
 # 他のCRUD処理
@@ -104,7 +105,7 @@ def update_article_list(
     url: Optional[str] = None,
     last_res_id: Optional[int] = None,
     moved: Optional[bool] = None,
-    new_id: Optional[int] = None,
+    new_article_title: Optional[str] = None,
 ):
     # 既存の記事を取得
     db_article = db.query(db_models.ArticleList).filter(db_models.ArticleList.article_id == article_id).first()
@@ -118,7 +119,7 @@ def update_article_list(
     if url is not None: db_article.url = url
     if last_res_id is not None: db_article.last_res_id = last_res_id
     if moved is not None: db_article.moved = moved
-    if new_id is not None: db_article.new_id = new_id
+    if new_article_title is not None: db_article.new_article_title = new_article_title
 
     # 変更をコミット
     db.commit()
@@ -133,7 +134,7 @@ def update_article_list(
         "url": db_article.url,
         "last_res_id": db_article.last_res_id,
         "moved": db_article.moved,
-        "new_id": db_article.new_id,
+        "new_article_title": db_article.new_article_title,
     }
 
 
@@ -148,7 +149,7 @@ def delete_article_list(db: Session, article_id: int):
             "url": db_article.url,
             "last_res_id": db_article.last_res_id,
             "moved": db_article.moved,
-            "new_id": db_article.new_id,
+            "new_article_title": db_article.new_article_title,
         }
 
         # 記事の削除
@@ -174,3 +175,21 @@ def insert_article_details(db: Session, article_details: List[ArticleDetailCreat
 def get_article_details(db: Session, article_id: int) -> List[ArticleDetailResponse]:
     details = db.query(db_models.ArticleDetail).filter(db_models.ArticleDetail.article_id == article_id).all()
     return [ArticleDetailResponse.from_orm(detail) for detail in details]
+
+def read_config_by_type(db: Session, config_type: str):
+    return db.query(Config).filter(Config.config_type == config_type).first()
+
+def get_website_by_name(db: Session, name: str) -> WebsiteResponse:
+    db_website = db.query(Website).filter(Website.name == name).first()
+    if db_website:
+        # SQLAlchemy オブジェクトを Pydantic モデルに変換
+        return WebsiteResponse.from_orm(db_website)
+    return None
+
+def create_website(db: Session, website_data):
+    db_website = Website(**website_data)
+    db.add(db_website)
+    db.commit()
+    db.refresh(db_website)
+    return db_website
+

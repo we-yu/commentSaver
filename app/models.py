@@ -25,10 +25,10 @@ class ArticleList(Base):
     url = Column(String(255), nullable=False)
     last_res_id = Column(Integer)
     moved = Column(Boolean)
-    new_id = Column(Integer)
+    new_article_title = Column(String(1024))
 
     def __repr__(self):
-        return f"ArticleList(id={self.id}, article_id={self.article_id}, title='{self.title}', url='{self.url}', last_res_id={self.last_res_id}, moved={self.moved}, new_id={self.new_id})"
+        return f"ArticleList(id={self.id}, article_id={self.article_id}, title='{self.title}', url='{self.url}', last_res_id={self.last_res_id}, moved={self.moved}, new_article_title={self.new_article_title})"
 
 class ArticleDetail(Base):
     __tablename__ = 'article_detail'

@@ -8,7 +8,7 @@ class ArticleListResponse(BaseModel):
     url: str
     last_res_id: int
     moved: bool
-    new_id: int
+    new_article_title: Optional[str] = None
 
 class ArticleListCreate(BaseModel):
     article_id: int
@@ -16,9 +16,9 @@ class ArticleListCreate(BaseModel):
     url: HttpUrl
     last_res_id: int
     moved: bool
-    new_id: int
+    new_article_title: Optional[str] = None
 
-    @validator('article_id', 'title', 'last_res_id', 'moved', 'new_id')
+    @validator('article_id', 'title', 'last_res_id', 'moved')
     def must_not_be_none(cls, v):
         if v is None:
             raise ValueError('must not be None')
@@ -38,7 +38,7 @@ class ArticleListUpdate(BaseModel):
     url: Optional[HttpUrl] = None
     last_res_id: Optional[int] = None
     moved: Optional[bool] = None
-    new_id: Optional[int] = None
+    new_article_title: Optional[str] = None
 
 class ArticleDetailCreate(BaseModel):
     article_id: int
@@ -65,3 +65,19 @@ class ArticleDetailResponse(BaseModel):
 
     class Config:
         orm_mode = True
+
+class ConfigResponse(BaseModel):
+    id: int
+    category: str
+    config_type: str
+    value: str
+
+class WebsiteResponse(BaseModel):
+    name: str
+    url: str
+    sub_tag1: str
+    sub_tag2: Optional[str] = None  # None を許可する
+    sub_tag3: Optional[str] = None  # None を許可する
+    class Config:
+        orm_mode = True  # この行を追加
+

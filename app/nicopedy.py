@@ -48,30 +48,22 @@ class NicopediScraper:
 
     # 対象が適正なニコ記事かどうかチェック.
     def is_valid_url(self, targetArtURL):
+        debug_print(f"Func: is_valid_url(), arg = {targetArtURL}")
 
-        # ニコニコ記事のURLかどうかチェック ----------------------------#
-        # DBからニコニコ記事のURLを取得
-        filter_condition = and_(Website.name == "Niconico")
-        # print("fileter condition =", filter_condition)
-        websites = self.db.select(Website, filter_condition)
-        # print("websites =", websites)
-        nico_url = websites[0].url
-        # print("nico_url =", nico_url)
+        response = self.api_db_access.read_website_by_name("Niconico")
+        if response.status_code != 200:
+            debug_print("Failed to get website data.")
+            return False
+        website_data = response.json()
+        nico_url = website_data['url']
         is_Nicopedi_URL = targetArtURL.startswith(nico_url)
-        # ---------------------------------------------------------#
-        # API_URL = "http://api_container:8000"
-        # filter_condition = {"url": targetArtURL}
-        # response = requests.get(f"{API_URL}/article_list", params=filter_condition)
-        # websites = response.json()
-
-        # if response.status_code == 200:
-        #     is_Nicopedi_URL = True
-        # ---------------------------------------------------------#
 
         return is_Nicopedi_URL
     
     # 対象URLからスクレイピングデータの取得、ページが存在しない場合はメッセージ表示して終了
     def scrape_article_top(self, url):
+        debug_print(f"Func: scrape_article_top(), arg = {url}")
+
         ####################################################
         # http://yamori-jp.blogspot.com/2022/09/python-ssl-unsafelegacyrenegotiationdis.html
 
@@ -83,22 +75,25 @@ class NicopediScraper:
                 web_content = response.read()
             soup = BeautifulSoup(web_content, "html.parser")
         except urllib.error.HTTPError as e:
-            ErrorHandler.handle_error(e, f"HTTP error occurred: {e.code}", PROGRAM_EXIT)
+            ErrorHandler.handle_error(e, f"HTTP error occurred CODE: {e.code}", PROGRAM_EXIT)
             return None
         except urllib.error.URLError as e:
-            ErrorHandler.handle_error(e, f"URL error occurred: {e.reason}", PROGRAM_EXIT)
+            ErrorHandler.handle_error(e, f"URL error occurred REASON: {e.reason}", PROGRAM_EXIT)
             return None
         ####################################################
         return soup
 
     # 記事IDを取得
     def get_article_id(self, soup):
-        article_id = 0
         meta_og_url = soup.find("meta", {"property": "og:url"})
+        if meta_og_url is None:
+            debug_print("Meta og:url tag not found.")
+            return None  # または適切なエラーハンドリング
 
         meta_url = meta_og_url.get("content")
         article_id = meta_url.rsplit('/', 1)[-1]  # URLの最後の部分を取得
 
+        debug_print(f"Func: get_article_id(), article_id = {article_id}")
         return article_id
 
     # 記事に取得可能なレスが存在するかチェック
@@ -107,23 +102,20 @@ class NicopediScraper:
         #  BBSが存在しない場合は「st-pg_contents」クラスが存在しない。マークとなるクラス名はDB内で定義済み。
         return self.is_exist_target_class(soup, "RES NOT EXIST CLASS")
 
-    # 記事内容が存在するページかチェック
-    # 「存在しない記事」にのみ存在するクラスを取得
-    # "scrape_article_top"でエラーハンドリングできているため不要
-    # def is_article_exist(self, soup):
-    #     debug_print("Func: is_article_exist()")
-    #     return self.is_exist_target_class(soup, "ARTICLE NOT EXIST CLASS")
-
     # 渡したsoupデータ内に、tagで指定したクラスが存在するかチェック
     def is_exist_target_class(self, soup, tag):
+        debug_print(f"Func: is_exist_target_class(), tag = {tag}")
+
         # tagを手掛かりに、DBからクラス名を取得
-        filter_condition = and_(Config.config_type == tag)
-        configs = self.db.select(Config, filter_condition)
-        config_value = configs[0].value
+        config_data = self.api_db_access.read_config_by_type(tag)
+        if not config_data:
+            debug_print("Failed to get config data :", tag)
+            return None
+
+        config_value = config_data['value']
 
         # 引っ張ってきたクラスが存在するかチェック（存在する場合はTrueを返す）
         class_exists = soup.find(class_=config_value) != None
-
         # debug_print(f"Is exists {config_value} ? => {class_exists}")
 
         return class_exists
@@ -131,48 +123,68 @@ class NicopediScraper:
     # 記事が既にスクレイピング済みか(DB内に当該記事が存在するか)チェック。スクレイピング済みであれば最終レス番号を取得
     # APIを使ってDBから取得するように変更
     def is_already_scraped(self, article_id):
-        debug_print ("Func: is_already_scraped()")
+        debug_print (f"Func: is_already_scraped(), article_id = {article_id}")
 
         # article_idをキーにDBから記事情報を取得
-        response = self.api_db_access.select_article_list(article_id)
-        debug_print("response = ", response)
+        response = self.api_db_access.read_article_list_by_id(article_id)
+        # debug_print("response = ", response)
 
         if response.status_code == 200:
-            debug_print("Data exists.")
+            # debug_print("Data exists.")
             scraped = True
         else:
-            debug_print("Data not exists.")
+            # debug_print("Data not exists.")
             scraped = False
 
-        api_result = response.json()
-        matched_records = len(api_result)
-
-        debug_print("api_result = ", api_result, ": matched_records = ", matched_records)
 
         # 既にレコードが存在するか
         fetched_record = None
 
         if scraped:
+            api_result = response.json()
+
+            # matched_records = len(api_result)
+            # debug_print("api_result = ", api_result, ": matched_records = ", matched_records)
+
             fetched_record = api_result
+
             # if api_result['last_res_id'] is not None:
             #     # スクレイピング済みであれば
             #     debug_print("Already scraped. Last res no is ", fetched_record['last_res_id'])
         else:
-            debug_print("Never scraped. article_id = ", article_id)
+            debug_print("<<Never scraped>>")
 
         return fetched_record
+
+    # 記事が移動済みかチェック。移動済みであれば新IDを取得
+    def check_redirect(self, soup):
+        # リダイレクトの確認を行う関数
+        debug_print("Func: check_redirect()")
+
+        # 'http-equiv'が'refresh'であるmetaタグを探す
+        meta_refresh = soup.find('meta', attrs={'http-equiv': 'refresh'})
+        if not meta_refresh:
+            # http-equiv='refresh'を持つmetaタグがない場合、リダイレクトは存在しない
+            return False, None
+
+        # content属性を取得
+        refresh_content = meta_refresh.get('content', '').lower()
+        url_split = refresh_content.split('url=')
+        if len(url_split) < 2:
+            # 'url='が見つからない場合の処理
+            debug_print("リフレッシュメタタグのcontent属性に'url='が含まれていません。")
+            return False, None
+
+        # 'url='が見つかった場合、contentを分割してURL部分を取得
+        url_part = url_split[1]
+        new_url = url_part.split(';')[0].strip() if ';' in url_part else url_part.strip()
+        return True, new_url
+
 
     # 記事タイトルを取得
     def get_title(self, soup):
         # Titleが含まれるクラスを取得
         article_title = soup.find("div", class_="a-title")
-
-        # リダイレクトされた場合は終了
-        meta_refresh = soup.find('meta', attrs={'http-equiv': 'refresh'})
-        if meta_refresh:
-            redirected = True
-            print_red('This article is redirected.', is_bold=True)
-            sys.exit(0)
 
         # 不要な情報の除去
         if article_title.find('span', class_='st-label_title-category') != None :
@@ -227,8 +239,7 @@ class NicopediScraper:
 
     # 開始ページ番・最終ページ番から走査対象となるURLリストを生成
     def get_scrape_target_urls(self, article_url, start_page, end_page):
-
-        debug_print(f"Scraping, start page = {start_page}, end page = {end_page}")
+        debug_print(f"Func: get_scrape_target_urls(), args = {article_url}, {start_page}, {end_page}")
 
         # 1, 31, 61, ... という形でページ番号が指定されているかチェック
         if(start_page % RESPONSES_PER_PAGE != 1):
@@ -385,35 +396,7 @@ class NicopediScraper:
 
     # 記事IDをキーにDB(article_detail)から一致するレコードを取得
     def get_allrecords_by_article_id(self, article_id):
-        
-        # filter_condition = and_(ArticleDetail.article_id == article_id)
-        # existing_res_list = self.db.select(ArticleDetail, filter_condition).order_by(asc(ArticleDetail.resno))
-
-        # ii = 0
-        # for existing_res in existing_res_list:
-        #     debug_print("1 existing_res = ", existing_res.article_id, ':', existing_res.resno, ':', existing_res.bodytext[:10], '★')
-        #     ii += 1
-        #     if ii > 20:
-        #         break
-
-        # print("Type Alchemy", type(existing_res_list))
-
-        # existing_res_list2 = self.api_db_access.select_article_details(article_id).json()
-        # ii = 0
-        # for existing_res in existing_res_list2:
-        #     debug_print("2 existing_res = ", existing_res['article_id'], ':', existing_res['resno'], ':', existing_res['bodytext'][:10], '★')
-        #     ii += 1
-        #     if ii > 20:
-        #         break
-
-        # print("Type Query", type(existing_res_list))
-        # print("Type API", type(existing_res_list2))
-
-        # if existing_res_list == existing_res_list2:
-        #     print("両方のリストは同じ内容です。")
-        # else:
-        #     print("リストの内容が異なります。")
-        # exit(0)
+        debug_print(f"Func: get_allrecords_by_article_id(), arg = {article_id}")
 
         existing_res_list = self.api_db_access.select_article_details(article_id)
 
@@ -424,31 +407,47 @@ class NicopediScraper:
         return None
 
     def scrape_and_store(self, url):
-        # URLをエンコード
+        debug_print("Func: scrape_and_store()")
+
+        # URLをエンコード(タイトルが日本語の場合はエンコードしないとエラーになる)
         encoded_url = quote(url, safe='/:?=&')
-        debug_print("Scraping test. URL = ", url, "encoded_url = ", encoded_url)
+        debug_print("Scraping target URL = ", url, "encoded_url = ", encoded_url)
+
         url = encoded_url
 
         # スクレイピング実施
         
-        # 対象記事は存在するか
+        # 対象がニコニコ大百科のURLかをチェック
         result = self.is_valid_url(url)
-
-        # 記事が存在するかチェック 404でハンドリングできるなら不要？
-        # is_exist = self.is_article_exist(soup)
+        if result == False:
+            debug_print("Invalid URL.")
+            return None
 
         # 記事リスト情報収集(記事ID・タイトル・URL・最終レス番号・移動済みフラグ・新ID)
 
         # 対象WebページのTopをスクレイプする
         soup = self.scrape_article_top(url)
-
         # スクレイプに失敗した場合はプログラム終了。
         if soup == None:
             debug_print("Failed to scrape article top.")
             exit(1)
 
+        # リダイレクト有無をチェック
+        is_redirected, new_url = self.check_redirect(soup)
+        
+        # リダイレクトされた場合は終了
+        if is_redirected:
+            redirected = True
+            debug_print('This article has been redirected.')
+            debug_print("New URL = ", new_url)
+            sys.exit(0)
+
         # 記事IDを取得
         article_id = self.get_article_id(soup)
+        if article_id == None:
+            debug_print("Failed to get article ID.")
+            exit(1)
+
         article_id = int(article_id)
 
         # 記事に取得可能なレスが存在するかチェック
@@ -457,12 +456,12 @@ class NicopediScraper:
             debug_print("BBS is not exist.")
             return None
         
-        debug_print(f"Fetching ID:{article_id}...")
+        debug_print(f"Fetching article's ID :{article_id}...")
 
         # 記事が既にスクレイピング済みかチェック。スクレイピング済みであれば最終レス番号を取得。
         fetched_record = self.is_already_scraped(article_id)
 
-        debug_print("fetched_record = ", fetched_record, type(fetched_record))
+        # debug_print("fetched_record = ", fetched_record, type(fetched_record))
 
         # ここまで取得したList用データを格納する辞書を作成
         # Listにデータが存在しない場合(対象記事が未スクレイピングの場合)
@@ -478,11 +477,11 @@ class NicopediScraper:
                 'url': url,
                 'last_res_id': 0,
                 'moved': False,
-                'new_id': -1
+                'new_article_title': None
             }
 
             # 新たに挿入する記事のタイトルを表示
-            debug_print("This is new article.")
+            debug_print(f"New article, name is <{title}>")
 
         # Listにデータが存在する場合(対象記事が既にスクレイピング済みの場合)
         else:
@@ -495,13 +494,13 @@ class NicopediScraper:
             #     'url': fetched_record.url,
             #     'last_res_id': fetched_record.last_res_id,
             #     'moved': fetched_record.moved,
-            #     'new_id': fetched_record.new_id
+            #     'new_article_title': fetched_record.new_article_title
             # }
 
             # 既にスクレイピング済みの記事のタイトルを表示
-            debug_print("This is existing article.")
+            debug_print(f"Existing article, name is <{article_list_dict['title']}>")
 
-        debug_print("Data of article_list_dict = ", article_list_dict)
+        debug_print("Currently data of article_list_dict = ", article_list_dict)
 
         # 最後にスクレイピングした記事のページ番号を取得
         # for idx in range(20, 30):
@@ -551,11 +550,22 @@ class NicopediScraper:
         new_insert = [res for res in all_res if res['resno'] not in indb_resnos]
 
         # 重複レコード出力
-        for res in duplicates:
-            debug_print("DUPLICATED:", res['article_id'], ':',res['resno'], ':',res['bodytext'][:10], '★')
+        if duplicates:
+            debug_print("DUPLICATED:", duplicates[0]['article_id'], ':', duplicates[0]['resno'], ':', duplicates[0]['bodytext'][:10], '★')
+            if len(duplicates) > 1:  # 1件以上ある場合のみ最後のレコードを表示
+                debug_print("DUPLICATED:", duplicates[-1]['article_id'], ':', duplicates[-1]['resno'], ':', duplicates[-1]['bodytext'][:10], '★')
+
         # 非重複レコード出力(DBへの書き込み対象)
-        for res in new_insert:
-            debug_print("NEW INSERT:", res['article_id'], ':',res['resno'], ':',res['bodytext'][:10], '★')
+        if new_insert:
+            debug_print("NEW INSERT:", new_insert[0]['article_id'], ':', new_insert[0]['resno'], ':', new_insert[0]['bodytext'][:10], '★')
+            if len(new_insert) > 1:  # 1件以上ある場合のみ最後のレコードを表示
+                debug_print("NEW INSERT:", new_insert[-1]['article_id'], ':', new_insert[-1]['resno'], ':', new_insert[-1]['bodytext'][:10], '★')
+
+        # for res in duplicates:
+        #     debug_print("DUPLICATED:", res['article_id'], ':',res['resno'], ':',res['bodytext'][:10], '★')
+        # 非重複レコード出力(DBへの書き込み対象)
+        # for res in new_insert:
+        #     debug_print("NEW INSERT:", res['article_id'], ':',res['resno'], ':',res['bodytext'][:10], '★')
 
         # new_insertが空の場合(挿入すべき新しい書き込みがない)は処理終了
         if len(new_insert) == 0:
@@ -574,9 +584,9 @@ class NicopediScraper:
             update_data = {
                 'last_res_id': article_list_dict['last_res_id'],
                 'moved': article_list_dict['moved'],
-                'new_id': article_list_dict['new_id']
+                'new_article_title': article_list_dict['new_article_title']
             }
-            debug_print("update_data = ", update_data)
+            # debug_print("update_data = ", update_data)
             # self.db.update(ArticleList, filter, update_data)
             self.api_db_access.update_article_list(article_id, update_data)
         
@@ -584,16 +594,17 @@ class NicopediScraper:
         else:
             debug_print("Inserting new record =", article_list_dict)
             # self.db.insert(ArticleList, article_list_dict)
-            self.api_db_access.insert_article_list(article_list_dict)
+            self.api_db_access.create_article_list(article_list_dict)
 
-        debug_print("Inserting new records for Detail =", new_insert)
         # self.db.bulk_insert(ArticleDetail, new_insert)
+
+        debug_print("Inserting new records for Detail, record length is ", len(new_insert))
         self.api_db_access.insert_article_details(new_insert)
 
         return None
 
-    def insert_article_list(self, article_list_dict):
-        debug_print("Func: insert_article_list()")
+    def create_article_list(self, article_list_dict):
+        debug_print("Func: create_article_list()")
         endPointURL = f"{API_URL}/article_list"
         response = requests.post(endPointURL, json=article_list_dict)
         res = response.status_code
@@ -601,7 +612,7 @@ class NicopediScraper:
 
 
 def alchemy_sample(db):
-    print("Alchemy test.")
+    debug_print("Alchemy test.")
 
     insert_data = {
         "name": "ALC test",
@@ -614,23 +625,23 @@ def alchemy_sample(db):
 
     filter_condition = and_(Website.name == "desired_name")
     results = db.select(Website, filter_condition)
-    print("filter condition =", filter_condition)
+    debug_print("filter condition =", filter_condition)
 
     for result in results:
-        # print(result)
-        print(f"name: {result.name}, url: {result.url}, sub_tag1: {result.sub_tag1}, sub_tag2: {result.sub_tag2}, sub_tag3: {result.sub_tag3}")
+        # debug_print(result)
+        debug_print(f"name: {result.name}, url: {result.url}, sub_tag1: {result.sub_tag1}, sub_tag2: {result.sub_tag2}, sub_tag3: {result.sub_tag3}")
 
     return None
 
 
 def call_scraping(article_title):
+    debug_print("Func: call_scraping()")
     db_uri = f'mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}@db_container/{MYSQL_DATABASE}'
-    print("db_uri = ", db_uri)
+    # debug_print("db_uri = ", db_uri)
     db = Database(db_uri)
 
     # URLを生成
     article_url = f"https://dic.nicovideo.jp/a/{article_title}"
-    debug_print("Scraping test. URL = ", article_url)
 
     # article_url = "https://dic.nicovideo.jp/a/%E5%86%8D%E7%8F%BE" # 再現 / レス数0サンプル
     # article_url = "https://dic.nicovideo.jp/a/%E5%9C%9F%E8%91%AC" # 土葬 / レス数30以下サンプル
@@ -640,33 +651,26 @@ def call_scraping(article_title):
 
     scraper = NicopediScraper(db)
 
-    # scraper.api_access_sample()
-    # scraper.api_db_access.api_insert_article_sample()
-    # scraper.api_db_access.api_update_article_sample()
-    # scraper.api_db_access.api_delete_article_sample()
+    # scraper.test_api_access()
+    # scraper.api_db_access.test_create_article()
+    # scraper.api_db_access.test_update_article()
+    # scraper.api_db_access.test_delete_article()
 
-    # scraper.api_db_access.api_insert_article_details_sample()
-    # response = scraper.api_db_access.api_read_article_details_sample(12436)
+    # scraper.api_db_access.test_create_article_details()
+    # response = scraper.api_db_access.api_read_article_details_sample(4567890)
+
+    # exit(0)
 
     scraper.scrape_and_store(article_url)
 
     return None
 
 if __name__ == "__main__":
-    print("Called as main.")
+    debug_print("Called as main.")
     if len(sys.argv) > 1:
         article_title = sys.argv[1]
         call_scraping(article_title)
     else:
-        print("No article title provided. Exiting program.")
+        debug_print("No article title provided. Exiting program.")
         sys.exit(1)
-    
-    # db_uri = 'mysql+pymysql://admin:S8n6F2a!@db_container/nico_db'
-    # print("db_uri = ", db_uri)
-    # db = Database(db_uri)
-    # result = alchemy_sample(db)
-
-    # db = Database('db_container', 'admin', 'S8n6F2a!', 'nico_db')
-    # scraper = NicopediScraper(db)
-    # scraper.db_access_sample()
-
+    debug_print("Program end.")

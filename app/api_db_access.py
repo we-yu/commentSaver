@@ -2,27 +2,24 @@
 import requests
 from debug_tools import debug_print
 
-    
-
 class API_DB_Access:
     def __init__(self, api_url):
         self.api_url = api_url
 
     # ArticleList用のAPI関数 -----------------------------------------------------------------------
-
-    def insert_article_list(self, article_data):
+    def create_article_list(self, article_data):
         print("Inserting into article_list.")
 
         # バリデーション: 必要なキーが辞書に含まれているか確認
-        required_keys = ["article_id", "title", "url", "last_res_id", "moved", "new_id"]
+        required_keys = ["article_id", "title", "url", "last_res_id", "moved", "new_article_title"]
         for key in required_keys:
             if key not in article_data:
                 print(f"Error: '{key}' is missing from article data.")
                 return None
 
         # データ型とフォーマットのチェック
-        if not isinstance(article_data["article_id"], int) or not isinstance(article_data["last_res_id"], int) or not isinstance(article_data["new_id"], int):
-            print("Error: 'article_id', 'last_res_id', 'new_id' should be integers.")
+        if not isinstance(article_data["article_id"], int) or not isinstance(article_data["last_res_id"], int):
+            print("Error: 'article_id', 'last_res_id' should be integers.")
             return None
         if not isinstance(article_data["moved"], bool):
             print("Error: 'moved' should be a boolean value.")
@@ -43,7 +40,7 @@ class API_DB_Access:
 
         return response
 
-    def select_article_list(self, article_id):
+    def read_article_list_by_id(self, article_id):
         print("Selecting from article_list.")
 
         # バリデーション: article_id が整数であることを確認
@@ -104,7 +101,6 @@ class API_DB_Access:
         return response
 
     # ArticleDetail用のAPI関数 ---------------------------------------------------------------------
-
     def insert_article_details(self, details_data):
         print("Inserting into article_detail.")
 
@@ -157,6 +153,19 @@ class API_DB_Access:
 
         return response
 
+    # 設定値用のAPI関数 ---------------------------------------------------------------------------
+    def read_config_by_type(self, config_type):
+        response = requests.get(f"{self.api_url}/config/{config_type}")
+        if response.status_code == 200:
+            return response.json()
+        else:
+            debug_print(f"Failed to get config data for {config_type}. Status code: {response.status_code}")
+            return None
+
+    def read_website_by_name(self, name):
+        response = requests.get(f"{self.api_url}/websites/{name}")
+        return response
+
     # << Trial functions ========================================================================
     def db_access_sample(self):
         print("DB access test.")
@@ -182,7 +191,7 @@ class API_DB_Access:
 
 
     # ScraperコンテナからAPIコンテナのAPI呼び出しテスト
-    def api_access_sample(self):
+    def test_api_access(self):
         print("API access test.")
 
         article_id = 430509
@@ -200,7 +209,7 @@ class API_DB_Access:
         # exit(1)
         return None
 
-    def api_delete_article_sample(self):
+    def test_delete_article(self):
         print("API delete article test.")
 
         # Linuxのarticle_idを指定
@@ -218,7 +227,7 @@ class API_DB_Access:
 
         return None
 
-    def api_update_article_sample(self):
+    def test_update_article(self):
         print("API update article test.")
 
         # Linuxのarticle_idを指定
@@ -228,7 +237,7 @@ class API_DB_Access:
         update_data = {
             "last_res_id": 200,  # 仮の値
             "moved": True,
-            "new_id": 474000  # 仮の値
+            "new_article_title": "474000-article"  # 仮の値
         }
 
         # UPDATE処理を実行
@@ -242,7 +251,7 @@ class API_DB_Access:
 
         return None
 
-    def api_insert_article_sample(self):
+    def test_create_article(self):
         print("API insert article test.")
 
         # 挿入する記事データを指定
@@ -252,11 +261,11 @@ class API_DB_Access:
             "url": "https://dic.nicovideo.jp/a/linux",
             "last_res_id": 145,
             "moved": False,
-            "new_id": -1
+            "new_article_title": None
         }
 
         # INSERT処理を実行
-        response = self.insert_article_list(article_data)
+        response = self.create_article_list(article_data)
 
         # レスポンス結果を確認
         if response and response.status_code == 200:
@@ -266,14 +275,14 @@ class API_DB_Access:
         
         return None
 
-    def api_insert_article_details_sample(self):
+    def test_create_article_details(self):
         print("API insert article details test.")
         self.api_url = "http://api_container:8000"
 
         # テスト用の記事詳細データを作成
         article_details_data = [
             {
-                "article_id": 12436,
+                "article_id": 20002345,
                 "resno": 1,
                 "post_name": "テストユーザー1",
                 "post_date": "2022-01-01T12:00:00",
@@ -283,7 +292,7 @@ class API_DB_Access:
                 "deleted": False
             },
             {
-                "article_id": 14436,
+                "article_id": 4567890,
                 "resno": 1,
                 "post_name": "テストユーザー2",
                 "post_date": "2022-01-02T13:00:00",
@@ -293,7 +302,7 @@ class API_DB_Access:
                 "deleted": False
             },
             {
-                "article_id": 14436,
+                "article_id": 4567890,
                 "resno": 2,
                 "post_name": "テストユーザー3",
                 "post_date": "2022-01-03T14:00:00",
@@ -303,7 +312,7 @@ class API_DB_Access:
                 "deleted": False
             },
             {
-                "article_id": 33436,
+                "article_id": 5678,
                 "resno": 1,
                 "post_name": "テストユーザー4",
                 "post_date": "2022-01-04T15:00:00",
@@ -313,7 +322,7 @@ class API_DB_Access:
                 "deleted": False
             },
             {
-                "article_id": 33436,
+                "article_id": 5678,
                 "resno": 2,
                 "post_name": "テストユーザー5",
                 "post_date": "2022-01-05T16:00:00",
