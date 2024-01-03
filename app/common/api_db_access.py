@@ -1,6 +1,6 @@
 # このファイルは、DBにアクセスするためのAPIを提供する。
 import requests
-from debug_tools import debug_print
+from app.util.debug_tools import debug_print
 
 class API_DB_Access:
     def __init__(self, api_url):
@@ -164,6 +164,10 @@ class API_DB_Access:
 
     def read_website_by_name(self, name):
         response = requests.get(f"{self.api_url}/websites/{name}")
+        if response.status_code != 200:
+            debug_print("Failed to get website data.")
+            return False
+
         return response
 
     # << Trial functions ========================================================================

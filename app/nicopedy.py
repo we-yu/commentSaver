@@ -29,7 +29,7 @@ from debug_tools import debug_print
 from db_operator import Database
 from error_handler import ErrorHandler, PROGRAM_EXIT, PROGRAM_CONTINUE
 from date_tools import convert_jp_weekday_to_en
-from api_db_access import API_DB_Access
+from app.common.api_db_access import API_DB_Access
 
 
 # 掲示板、1Pあたりのレス数
