@@ -30,15 +30,16 @@ class ListProcessor:
 
         # 対象がニコ百記事として適正なURLかチェック
         if self.is_valid_url(url) == False:
-            debug_print("Invalid URL.")
+            debug_print("This URL is inappropriate for Nicopedia. The process will be terminated.")
             return False
-        debug_print("Valid URL.")
+        
+        debug_print("This URL is valid. Scraping will be started.")
 
         # 対象WebページのTopをスクレイプする
         soup = self.scrape_article_top(url)
         # スクレイプに失敗した場合はプログラム終了。
         if soup == None:
-            debug_print("Failed to scrape article top.")
+            debug_print("Scraping of the article page failed. The process will be terminated.")
             exit(1)
 
         # リダイレクト有無をチェック
@@ -55,7 +56,7 @@ class ListProcessor:
         article_id = self.get_article_id(soup)
         # 記事IDが取得できなかった場合は終了
         if article_id == None:
-            debug_print("Failed to get article ID.")
+            debug_print("Failed to retrieve the article ID. The process will be terminated.")
             exit(1)
 
         article_id = int(article_id)
@@ -89,7 +90,7 @@ class ListProcessor:
 
         # 記事一覧テーブルにレコードを追加
         debug_print("Currently data of article_list_dict = ", article_list_dict)
-        # self.api_db_access.create_article_list(article_list_dict)
+        self.api_db_access.create_article_list(article_list_dict)
 
         # 既存記事が指定された場合、特にデータの更新は行わない。（定期処理でlistとdetail両方更新する）
 
@@ -238,16 +239,9 @@ class ListProcessor:
         # URLを生成
         article_url = f"https://{NICOPEDY_DOMAIN}/{NICOPEDY_PATH_TANGO}/{article_title}"
 
-        # scraper.test_api_access()
-
         # self.api_db_access.test_create_article()
 
-        # scraper.api_db_access.test_update_article()
-        # scraper.api_db_access.test_delete_article()
-
-        # scraper.api_db_access.test_create_article_details()
-        # response = scraper.api_db_access.api_read_article_details_sample(4567890)
-
+        # スクレイピング処理を呼び出す
         self.list_processor_main(article_url)
 
 # スクリプトとして実行された場合のエントリポイント

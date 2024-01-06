@@ -8,7 +8,7 @@ class API_DB_Access:
 
     # ArticleList用のAPI関数 -----------------------------------------------------------------------
     def create_article_list(self, article_data):
-        print("Inserting into article_list.")
+        debug_print("Inserting into article_list.")
 
         # バリデーション: 必要なキーが辞書に含まれているか確認
         required_keys = ["article_id", "title", "url", "last_res_id", "moved", "new_article_title"]
@@ -273,9 +273,9 @@ class API_DB_Access:
 
         # レスポンス結果を確認
         if response and response.status_code == 200:
-            print("Insert successful for Linux article.")
+            debug_print(f"Insert successful for {article_data['title']} article.")
         else:
-            print("Insert failed for Linux article.")
+            debug_print(f"Insert failed for {article_data['title']} article.")
         
         return None
 
