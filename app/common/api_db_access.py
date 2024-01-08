@@ -60,6 +60,22 @@ class API_DB_Access:
             print(f"Error during API call: {response.status_code}, {response.text}")
 
         return response
+    
+    def read_all_article_list(self):
+        print("Fetching all records from article_list.")
+
+        # APIリクエストの送信
+        endPointURL = f"{self.api_url}/article_list/all"
+        response = requests.get(endPointURL)
+
+        # レスポンスの確認
+        if response.status_code == 200:
+            api_result = response.json()
+            print("Select all from article_list successful, Record count is", len(api_result))
+            return api_result
+        else:
+            print(f"Error during API call: {response.status_code}, {response.text}")
+            return None
 
     def update_article_list(self, article_id, update_data):
         print(f"Updating article_list for article_id={article_id}.")

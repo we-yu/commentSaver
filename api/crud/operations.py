@@ -17,9 +17,12 @@ def get_all_articles(db: Session):
     articles = []
     for db_article in db_articles:
         article = {
-            "article_id": db_article.article_id,  # もしこの属性名が違う場合は、適切な属性名に変更してください
+            "article_id": db_article.article_id,  # 必要なら属性名を変更してください
             "title": db_article.title,
-            "url": db_article.url
+            "url": db_article.url,
+            "last_res_id": db_article.last_res_id,
+            "moved": db_article.moved,
+            "new_article_title": db_article.new_article_title
         }
         articles.append(article)
     

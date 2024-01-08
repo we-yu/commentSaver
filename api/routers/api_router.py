@@ -98,6 +98,11 @@ async def read_all_article_lists(
         # articles = operations.get_all_articles(db)
         # return articles
 
+@router.get("/article_list/all", response_model=List[ArticleListResponse])
+def read_all_articles(db: Session = Depends(get_db)):
+    articles = operations.get_all_articles(db)
+    return [ArticleListResponse(**article) for article in articles]
+
 # UPDATE:記事一覧情報を更新する
 @router.put("/article_list/{article_id}", response_model=ArticleListResponse)
 def update_article_list(article_id: int, article: ArticleListUpdate, db: Session = Depends(get_db)):
