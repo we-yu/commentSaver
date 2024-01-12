@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 from app.common.api_db_access import API_DB_Access
 import app.common.settings
 
+from common_utils import CommonUtils
 from debug_tools import debug_print
 from error_handler import ErrorHandler, PROGRAM_EXIT, PROGRAM_CONTINUE
 
@@ -36,14 +37,14 @@ class ListProcessor:
         debug_print("This URL is valid. Scraping will be started.")
 
         # 対象WebページのTopをスクレイプする
-        soup = self.scrape_article_top(url)
+        soup = CommonUtils.scrape_article_top(url)
         # スクレイプに失敗した場合はプログラム終了。
         if soup == None:
             debug_print("Scraping of the article page failed. The process will be terminated.")
             exit(1)
 
         # リダイレクト有無をチェック
-        is_redirected, new_url = self.check_redirect(soup)
+        is_redirected, new_url = CommonUtils.check_redirect(soup)
         
         # リダイレクトされた場合は終了
         if is_redirected:
@@ -110,53 +111,6 @@ class ListProcessor:
         else:
             return False
 
-    # 対象URLからスクレイピングデータの取得、ページが存在しない場合はメッセージ表示して終了
-    def scrape_article_top(self, url):
-        debug_print(f"Func: scrape_article_top(), arg = {url}")
-
-        ####################################################
-        # http://yamori-jp.blogspot.com/2022/09/python-ssl-unsafelegacyrenegotiationdis.html
-
-        ctx = ssl.create_default_context()
-        ctx.options |= 0x4
-        # 対象記事が存在しない場合のハンドリング
-        try:
-            with urllib.request.urlopen(url, context=ctx) as response:
-                web_content = response.read()
-            soup = BeautifulSoup(web_content, "html.parser")
-        except urllib.error.HTTPError as e:
-            ErrorHandler.handle_error(e, f"HTTP error occurred CODE: {e.code}", PROGRAM_EXIT)
-            return None
-        except urllib.error.URLError as e:
-            ErrorHandler.handle_error(e, f"URL error occurred REASON: {e.reason}", PROGRAM_EXIT)
-            return None
-        ####################################################
-        return soup
-
-    # 記事が移動済みかチェック。移動済みであれば新IDを取得
-    def check_redirect(self, soup):
-        # リダイレクトの確認を行う関数
-        debug_print("Func: check_redirect()")
-
-        # 'http-equiv'が'refresh'であるmetaタグを探す
-        meta_refresh = soup.find('meta', attrs={'http-equiv': 'refresh'})
-        if not meta_refresh:
-            # http-equiv='refresh'を持つmetaタグがない場合、リダイレクトは存在しない
-            return False, None
-
-        # content属性を取得
-        refresh_content = meta_refresh.get('content', '').lower()
-        url_split = refresh_content.split('url=')
-        if len(url_split) < 2:
-            # 'url='が見つからない場合の処理
-            debug_print("リフレッシュメタタグのcontent属性に'url='が含まれていません。")
-            return False, None
-
-        # 'url='が見つかった場合、contentを分割してURL部分を取得
-        url_part = url_split[1]
-        new_url = url_part.split(';')[0].strip() if ';' in url_part else url_part.strip()
-        return True, new_url
-
     # 記事IDを取得
     def get_article_id(self, soup):
         meta_og_url = soup.find("meta", {"property": "og:url"})
@@ -170,7 +124,7 @@ class ListProcessor:
         debug_print(f"Func: get_article_id(), article_id = {article_id}")
         return article_id
 
-    # 記事が既にスクレイピング済みか(DB内に当該記事が存在するか)チェック。スクレイピング済みであれば最終レス番号を取得
+    # 記事が既にスクレイピング済みか(DB内に当該記事が存在するか)チェック。スクレイピング済みであれば該当するリストデータのレコードを取得
     # APIを使ってDBから取得するように変更
     def is_already_scraped(self, article_id):
         debug_print (f"Func: is_already_scraped(), article_id = {article_id}")

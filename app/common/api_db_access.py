@@ -186,6 +186,18 @@ class API_DB_Access:
 
         return response
 
+    # セッション用のAPI関数 -------------------------------------------------------------------------
+    def create_session(self):
+        response = requests.post(f"{self.api_url}/session/create")
+        return response.json()["session_id"]
+
+    def close_session(self, session_id):
+        requests.delete(f"{self.api_url}/session/{session_id}")
+
+    def manage_transaction(self, session_id, action):
+        requests.post(f"{self.api_url}/transaction/{session_id}/{action}")
+
+
     # << Trial functions ========================================================================
     def db_access_sample(self):
         print("DB access test.")

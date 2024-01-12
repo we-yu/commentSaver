@@ -7,14 +7,14 @@ from time import sleep
 import re # 正規表現用
 from datetime import datetime
 
-
 # Local
 from app.common.api_db_access import API_DB_Access
 import app.common.settings
 
+from common_utils import CommonUtils
 from debug_tools import debug_print
-from error_handler import ErrorHandler, PROGRAM_EXIT, PROGRAM_CONTINUE
 from date_tools import convert_jp_weekday_to_en
+from error_handler import ErrorHandler, PROGRAM_EXIT, PROGRAM_CONTINUE
 
 # 掲示板、1Pあたりのレス数
 RESPONSES_PER_PAGE = 30  # 1ページあたりの表示数
@@ -46,6 +46,7 @@ class DetailController:
 
             # Debug
             if article['title'] != "オールひろゆき":
+                # https://dic.nicovideo.jp/a/%E3%82%AA%E3%83%BC%E3%83%AB%E3%81%B2%E3%82%8D%E3%82%86%E3%81%8D
                 continue
 
             # article_listの一覧に沿って、スクレイピングを実行する
@@ -62,14 +63,17 @@ class DetailController:
     def scrape_and_store(self, article_data):
         debug_print("Func: scrape_and_store(), article title is ", article_data["title"])
         # データをスクレイピングして保存するメインの処理
+
+        # debug_print("Call util func = ", CommonUtils.sample_common_utils("test"))
         
         # 記事TOPのURLを取得し、スクレイピングを実行
         top_url = article_data["url"]
-        soup = self.scrape_article_top(top_url)
+        soup = CommonUtils.scrape_article_top(top_url)
+
 
         # リダイレクトチェック
         # リダイレクトされた場合は終了
-        is_redirected, new_url = self.check_redirect(soup)
+        is_redirected, new_url = CommonUtils.check_redirect(soup)
         if is_redirected:
             redirected = True
             debug_print(f"This article has been redirected. Processing will be terminated.")
@@ -152,56 +156,29 @@ class DetailController:
 
         # article_list更新
         # article_detail挿入
-        response = self.api_db_access.update_article_list(article_list_dict['article_id'], update_data)
-        response = self.api_db_access.insert_article_details(new_insert)
 
+        # 新しいDBセッションを生成、取得
+        session_id = self.api_db_access.create_session()
 
-    # 対象URLからスクレイピングデータの取得、ページが存在しない場合はメッセージ表示して終了
-    def scrape_article_top(self, url):
-        debug_print(f"Func: scrape_article_top(), arg = {url}")
-
-        ####################################################
-        # http://yamori-jp.blogspot.com/2022/09/python-ssl-unsafelegacyrenegotiationdis.html
-
-        ctx = ssl.create_default_context()
-        ctx.options |= 0x4
-        # 対象記事が存在しない場合のハンドリング
         try:
-            with urllib.request.urlopen(url, context=ctx) as response:
-                web_content = response.read()
-            soup = BeautifulSoup(web_content, "html.parser")
-        except urllib.error.HTTPError as e:
-            ErrorHandler.handle_error(e, f"HTTP error occurred CODE: {e.code}", PROGRAM_EXIT)
-            return None
-        except urllib.error.URLError as e:
-            ErrorHandler.handle_error(e, f"URL error occurred REASON: {e.reason}", PROGRAM_EXIT)
-            return None
-        ####################################################
-        return soup
+            # トランザクション開始
+            self.api_db_access.manage_transaction(session_id, "begin")
 
-    # 記事が移動済みかチェック。移動済みであれば新IDを取得
-    def check_redirect(self, soup):
-        # リダイレクトの確認を行う関数
-        debug_print("Func: check_redirect()")
+            # ２つのテーブルの更新を行う
+            response = self.api_db_access.update_article_list(article_list_dict['article_id'], update_data)
+            response = self.api_db_access.insert_article_details(new_insert)
 
-        # 'http-equiv'が'refresh'であるmetaタグを探す
-        meta_refresh = soup.find('meta', attrs={'http-equiv': 'refresh'})
-        if not meta_refresh:
-            # http-equiv='refresh'を持つmetaタグがない場合、リダイレクトは存在しない
-            return False, None
+            # トランザクションコミット
+            self.api_db_access.manage_transaction(session_id, "commit")
+        except Exception as e:
+            # トランザクションロールバック
+            self.api_db_access.manage_transaction(session_id, "rollback")
+            raise e
+        finally:
+            # DBセッションを閉じる
+            self.api_db_access.close_session(session_id)    
+        return None
 
-        # content属性を取得
-        refresh_content = meta_refresh.get('content', '').lower()
-        url_split = refresh_content.split('url=')
-        if len(url_split) < 2:
-            # 'url='が見つからない場合の処理
-            debug_print("リフレッシュメタタグのcontent属性に'url='が含まれていません。")
-            return False, None
-
-        # 'url='が見つかった場合、contentを分割してURL部分を取得
-        url_part = url_split[1]
-        new_url = url_part.split(';')[0].strip() if ';' in url_part else url_part.strip()
-        return True, new_url
 
     # 渡したsoupデータ内に、tagで指定したクラスが存在するかチェック
     def is_exist_target_class(self, soup, tag):
