@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS article_detail (
     deleted BOOLEAN,
     PRIMARY KEY (article_id, resno),
     FOREIGN KEY (article_id) REFERENCES article_list(article_id)
+    ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS websites (

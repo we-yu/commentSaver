@@ -11,7 +11,7 @@ class ErrorHandler:
         # 特定のHTTPErrorをチェックして、404の場合はカスタムメッセージを表示
         if isinstance(e, HTTPError):
             if e.code == 404:
-                sys.stderr.write(Fore.RED + "Error: 404 Target article doesn't exist.\n")
+                sys.stderr.write(Fore.RED + f"Error: {e.code} - {e.reason}, Target article doesn't exist.\n")
             else:
                 sys.stderr.write(Fore.RED + f"An HTTP error occurred: {e.code} - {e.reason}\n")
         else:

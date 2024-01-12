@@ -2,30 +2,29 @@ import os
 
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session
 from crud import operations
 from typing import List, Union, Optional
 from models import pydantic_models, db_models
 from models.pydantic_models import ArticleListResponse, ArticleListCreate, ArticleListUpdate, ArticleDetailCreate, ArticleDetailResponse, ConfigResponse, WebsiteResponse
 from sqlalchemy.exc import OperationalError
+from session_manager import SessionManager
 
 # load_dotenv('../../.env') # 環境変数のロード
 MYSQL_DATABASE = os.environ.get("MYSQL_DATABASE")
 MYSQL_USER = os.environ.get("MYSQL_USER")
 MYSQL_PASSWORD = os.environ.get("MYSQL_PASSWORD")
 
-# SQLAlchemyの設定（URLは適切なものに置き換えてください）
+# SQLAlchemyの設定（
 DATABASE_URL = f'mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}@db_container/{MYSQL_DATABASE}'
 engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+session_manager = SessionManager(DATABASE_URL)
 
 # 依存性
 def get_db():
-    db = SessionLocal()
-    try:
+    with session_manager.session() as db:
         yield db
-    finally:
-        db.close()
 
 router = APIRouter()
 
@@ -98,6 +97,11 @@ async def read_all_article_lists(
         # articles = operations.get_all_articles(db)
         # return articles
 
+@router.get("/article_list/all", response_model=List[ArticleListResponse])
+def read_all_articles(db: Session = Depends(get_db)):
+    articles = operations.get_all_articles(db)
+    return [ArticleListResponse(**article) for article in articles]
+
 # UPDATE:記事一覧情報を更新する
 @router.put("/article_list/{article_id}", response_model=ArticleListResponse)
 def update_article_list(article_id: int, article: ArticleListUpdate, db: Session = Depends(get_db)):
@@ -166,3 +170,29 @@ def get_website(name: str, db: Session = Depends(get_db)):
     if website_response is None:
         raise HTTPException(status_code=404, detail="Website not found")
     return website_response
+
+# セッション管理 --------------------------------------------------
+# セッション管理
+@router.post("/session/create")
+def create_session():
+    db_session = session_manager.create_session()
+    return {"session_id": id(db_session)}
+
+@router.delete("/session/{session_id}")
+def close_session(session_id: int):
+    session_manager.close_session(session_id)
+
+# トランザクション管理
+@router.post("/transaction/{session_id}/{action}")
+def manage_transaction(session_id: int, action: str):
+    if action == "begin":
+        session_manager.begin_transaction(session_id)
+    elif action == "commit":
+        session_manager.commit_transaction(session_id)
+    elif action == "rollback":
+        session_manager.rollback_transaction(session_id)
+    else:
+        raise HTTPException(status_code=400, detail="Invalid action")
+
+
+

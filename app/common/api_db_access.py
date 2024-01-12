@@ -1,6 +1,6 @@
 # このファイルは、DBにアクセスするためのAPIを提供する。
 import requests
-from debug_tools import debug_print
+from app.util.debug_tools import debug_print
 
 class API_DB_Access:
     def __init__(self, api_url):
@@ -8,7 +8,7 @@ class API_DB_Access:
 
     # ArticleList用のAPI関数 -----------------------------------------------------------------------
     def create_article_list(self, article_data):
-        print("Inserting into article_list.")
+        debug_print("Inserting into article_list.")
 
         # バリデーション: 必要なキーが辞書に含まれているか確認
         required_keys = ["article_id", "title", "url", "last_res_id", "moved", "new_article_title"]
@@ -60,6 +60,22 @@ class API_DB_Access:
             print(f"Error during API call: {response.status_code}, {response.text}")
 
         return response
+    
+    def read_all_article_list(self):
+        print("Fetching all records from article_list.")
+
+        # APIリクエストの送信
+        endPointURL = f"{self.api_url}/article_list/all"
+        response = requests.get(endPointURL)
+
+        # レスポンスの確認
+        if response.status_code == 200:
+            api_result = response.json()
+            print("Select all from article_list successful, Record count is", len(api_result))
+            return api_result
+        else:
+            print(f"Error during API call: {response.status_code}, {response.text}")
+            return None
 
     def update_article_list(self, article_id, update_data):
         print(f"Updating article_list for article_id={article_id}.")
@@ -164,7 +180,23 @@ class API_DB_Access:
 
     def read_website_by_name(self, name):
         response = requests.get(f"{self.api_url}/websites/{name}")
+        if response.status_code != 200:
+            debug_print("Failed to get website data.")
+            return False
+
         return response
+
+    # セッション用のAPI関数 -------------------------------------------------------------------------
+    def create_session(self):
+        response = requests.post(f"{self.api_url}/session/create")
+        return response.json()["session_id"]
+
+    def close_session(self, session_id):
+        requests.delete(f"{self.api_url}/session/{session_id}")
+
+    def manage_transaction(self, session_id, action):
+        requests.post(f"{self.api_url}/transaction/{session_id}/{action}")
+
 
     # << Trial functions ========================================================================
     def db_access_sample(self):
@@ -269,9 +301,9 @@ class API_DB_Access:
 
         # レスポンス結果を確認
         if response and response.status_code == 200:
-            print("Insert successful for Linux article.")
+            debug_print(f"Insert successful for {article_data['title']} article.")
         else:
-            print("Insert failed for Linux article.")
+            debug_print(f"Insert failed for {article_data['title']} article.")
         
         return None
 

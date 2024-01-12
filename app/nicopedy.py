@@ -2,17 +2,15 @@ import sys
 import os
 
 import requests
-from requests.packages.urllib3.util import ssl_
 from urllib.parse import quote
 import urllib.request
 import ssl
 
-from sympy import fibonacci
+# from sympy import fibonacci
 
 from bs4 import BeautifulSoup
 import re # 正規表現用
 from time import sleep      # 待ち時間用
-from sqlalchemy import and_, or_, not_, asc, desc
 from datetime import datetime
 from dotenv import load_dotenv # .envファイルの読み込み
 load_dotenv('../.env') # 環境変数のロード
@@ -26,12 +24,12 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 import_dir = os.path.join(current_dir, 'util')
 sys.path.append(import_dir)
 
-from models import Website, Config, ArticleList, ArticleDetail
+# from models import Website, Config, ArticleList, ArticleDetail
 from debug_tools import debug_print
 from db_operator import Database
 from error_handler import ErrorHandler, PROGRAM_EXIT, PROGRAM_CONTINUE
 from date_tools import convert_jp_weekday_to_en
-from api_db_access import API_DB_Access
+from app.common.api_db_access import API_DB_Access
 
 
 # 掲示板、1Pあたりのレス数
@@ -580,7 +578,7 @@ class NicopediScraper:
         # 既にスクレイピング済みの場合(記事リストにレコードが存在する場合)はUPDATE
         if is_scraped:
             debug_print("Updating existing record.")
-            filter = (ArticleList.article_id == article_id)
+            # filter = (ArticleList.article_id == article_id)
             update_data = {
                 'last_res_id': article_list_dict['last_res_id'],
                 'moved': article_list_dict['moved'],
@@ -610,28 +608,6 @@ class NicopediScraper:
         res = response.status_code
         return res
 
-
-def alchemy_sample(db):
-    debug_print("Alchemy test.")
-
-    insert_data = {
-        "name": "ALC test",
-        "url": "https://alchemy.com",
-        "sub_tag1": "A",
-        "sub_tag2": "L",
-        "sub_tag3": "C"
-    }
-    db.insert(Website, insert_data)
-
-    filter_condition = and_(Website.name == "desired_name")
-    results = db.select(Website, filter_condition)
-    debug_print("filter condition =", filter_condition)
-
-    for result in results:
-        # debug_print(result)
-        debug_print(f"name: {result.name}, url: {result.url}, sub_tag1: {result.sub_tag1}, sub_tag2: {result.sub_tag2}, sub_tag3: {result.sub_tag3}")
-
-    return None
 
 
 def call_scraping(article_title):
