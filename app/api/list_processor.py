@@ -91,11 +91,16 @@ class ListProcessor:
 
         # 記事一覧テーブルにレコードを追加
         debug_print("Currently data of article_list_dict = ", article_list_dict)
-        self.api_db_access.create_article_list(article_list_dict)
+        response = self.api_db_access.create_article_list(article_list_dict)
+
+        if response.status_code == 200:
+            debug_print("Data inserted successfully.")
+        else:
+            debug_print("Data insertion failed.")
 
         # 既存記事が指定された場合、特にデータの更新は行わない。（定期処理でlistとdetail両方更新する）
 
-        return None
+        return response
 
     # 対象が適正なニコ記事かどうかチェック.
     def is_valid_url(self, targetArtURL):
@@ -196,7 +201,25 @@ class ListProcessor:
         # self.api_db_access.test_create_article()
 
         # スクレイピング処理を呼び出す
-        self.list_processor_main(article_url)
+        response = self.list_processor_main(article_url)
+        return response
+
+async def handle_article_entry(title):
+    debug_print("Func: api_entrypoint(), arg = ", title)
+    processor = ListProcessor("http://api_container:8000")
+    
+    response = processor.call_scraping(title)
+
+    # response = type("Response", (object,), {})()  # 空のオブジェクトを作成
+    # response.status_code = 200  # ステータスコードを設定
+    # response.json = lambda: {"message": "Dummy response"}  # ダミーのjsonメソッドを追加
+
+    # message = "Insert [" + title + "] failed."
+
+    # if response.status_code == 200:
+    #     message = "Insert [" + title + "] successfully."
+
+    return response
 
 # スクリプトとして実行された場合のエントリポイント
 if __name__ == "__main__":

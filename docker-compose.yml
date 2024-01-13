@@ -19,8 +19,8 @@ services:
   scraper:
     container_name: scraper_container
     tty: true
-    # ports:
-    #   - "10180:80"
+    ports:
+      - "5210:8000" # ホストの5210ポートをコンテナの8000ポートにフォワーディング
     build: ./build_scraper
     volumes:
       - .:/app
