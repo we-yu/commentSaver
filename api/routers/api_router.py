@@ -202,6 +202,7 @@ def manage_transaction(session_id: int, action: str):
 # WebAPP用のエンドポイント --------------------------------------------------
 @router.get("/forward-to-scraper/{article_title}")
 async def forward_to_scraper(article_title: str):
+    print("article_title =", article_title)
     scraper_url = f"http://scraper_container:8000/process-article/{article_title}"
     async with httpx.AsyncClient() as client:
         response = await client.get(scraper_url)
