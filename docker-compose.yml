@@ -19,8 +19,8 @@ services:
   scraper:
     container_name: scraper_container
     tty: true
-    # ports:
-    #   - "10180:80"
+    ports:
+      - "5210:8000" # ホストの5210ポートをコンテナの8000ポートにフォワーディング
     build: ./build_scraper
     volumes:
       - .:/app
@@ -45,6 +45,20 @@ services:
     depends_on:
       - db
 
+  webapp:
+    container_name: webapp_container
+    build:
+      context: .  # プロジェクトのルートディレクトリを指定
+      dockerfile: ./build_webapp/Dockerfile
+    volumes:
+      - ./webapp/my-app:/webapp
+    ports:
+      - "5310:3000"
+    networks:
+      - backend
+    depends_on:
+      - api
+
   phpmyadmin:
     container_name: phpmyadmin
     image: phpmyadmin/phpmyadmin
@@ -57,7 +71,6 @@ services:
       PMA_PASSWORD: ${MYSQL_PASSWORD}  # 環境変数からパスワードを取得
     networks:
       - backend
-
 
 networks:
   backend:

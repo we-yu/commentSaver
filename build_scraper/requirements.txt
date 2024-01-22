@@ -14,3 +14,5 @@ colorama
 sympy
 # For read .env file
 python-dotenv
+fastapi==0.68.0  # 必要なバージョンに変更して
+uvicorn==0.15.0  # uvicornも入れてね

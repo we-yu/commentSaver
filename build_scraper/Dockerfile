@@ -21,6 +21,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # ログイン後に手動で実行するのでコメントアウト
 # CMD ["python", "scraper.py"]
 
+# Dockerfile
+CMD ["uvicorn", "app.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
 # Define command to start bash
-ENTRYPOINT ["/bin/bash"]
+# ENTRYPOINT ["/bin/bash"]
 

@@ -7,6 +7,8 @@ WORKDIR /app
 # 依存関係をインストールするためのファイルをコピー
 COPY ./build_api/requirements.txt .
 
+# RUN apt-get update && apt-get install -y curl
+
 # 依存関係をインストール
 RUN pip install --no-cache-dir -r requirements.txt
 

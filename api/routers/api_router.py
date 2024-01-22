@@ -10,6 +10,8 @@ from models.pydantic_models import ArticleListResponse, ArticleListCreate, Artic
 from sqlalchemy.exc import OperationalError
 from session_manager import SessionManager
 
+import httpx
+
 # load_dotenv('../../.env') # 環境変数のロード
 MYSQL_DATABASE = os.environ.get("MYSQL_DATABASE")
 MYSQL_USER = os.environ.get("MYSQL_USER")
@@ -46,6 +48,8 @@ def test_db_connection(db: Session = Depends(get_db)):
         return {"status": "ok", "message": "Database connection successful"}
     except OperationalError:
         return {"status": "error", "message": "Database connection failed"}
+
+# Scraper用のエンドポイント --------------------------------------------------
 
 # CRUD処理 for article_list --------------------------------------------------
 # CREATE:記事一覧情報を追加する
@@ -195,4 +199,12 @@ def manage_transaction(session_id: int, action: str):
         raise HTTPException(status_code=400, detail="Invalid action")
 
 
-
+# WebAPP用のエンドポイント --------------------------------------------------
+@router.get("/forward-to-scraper/{article_title}")
+async def forward_to_scraper(article_title: str):
+    print("article_title =", article_title)
+    scraper_url = f"http://scraper_container:8000/process-article/{article_title}"
+    async with httpx.AsyncClient() as client:
+        response = await client.get(scraper_url)
+        response.raise_for_status()
+        return response.json()
